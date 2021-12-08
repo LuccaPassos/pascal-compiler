@@ -1,7 +1,7 @@
 JAVA=java
 JAVAC=javac
 
-ROOT=/home/joao/graduacao/compiladores/pascal-compiler
+ROOT=/home/humberto/Desktop/pascal-compiler
 
 ANTLR_PATH=$(ROOT)/tools/antlr-4.9.3-complete.jar
 CLASS_PATH_OPTION=-cp .:$(ANTLR_PATH)
