@@ -1,4 +1,4 @@
-program err_expression1
+program err_expression1;
 
 var a : real;
     b : integer;
@@ -10,4 +10,4 @@ begin
     e := a + b;
     a := a + (b - e) * b;
     e := (a + (b - e) / e) # (a + (b)); (* Unkown operator '#' *)
-end;
+end.

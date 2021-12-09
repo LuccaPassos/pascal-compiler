@@ -1,4 +1,4 @@
-program variable
+program variable;
 
 var a : real;
     b : integer;
@@ -7,4 +7,4 @@ var a : real;
 
 begin
     readln(a, b, c, d);
-end;
+end.
