@@ -1,18 +1,19 @@
-program aninhadoss;
+program err_if;
    
-Var X, Y, A, B : Integer;
+var X, Y, A, B : integer;
    
-Begin
+begin
   Readln (X,Y,A,B);
-  If (X > Y) Then
-    If(A > B)
-      Then Begin
+  if (X > Y) then
+    if(A > B)
+      then begin
         Writeln ('X é maior que Y e A é maior que B');
         Writeln ('O Valor de X é = ', X);
         Writeln ('O Valor de A é = ', A);
-      End
-      Else Begin
+      end
+      else begin
         Writeln ('A não é Maior que B');
         Writeln ('O Valor de B é = ', B);
-    Else Writeln ('X não é maior que Y');
-End.
+      (* Missing 'end' *)
+    else Writeln ('X não é maior que Y');
+end.

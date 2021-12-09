@@ -1,6 +1,6 @@
 program caseRepeat(input, output);
  
-(*** Demonstrate the repeat and case statements.  ***)
+(*** demonstrate the repeat and case statements.  ***)
  
 var
    number: integer;

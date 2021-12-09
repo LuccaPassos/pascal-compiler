@@ -28,4 +28,3 @@ begin
      write('F');
   writeln;
 end.
-
