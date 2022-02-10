@@ -113,7 +113,7 @@ bool_
    ;
 
 string
-   : STRING_LITERAL
+   : STRING_LITERAL # exprStrVal
    ;
 
 typeDefinitionPart
@@ -154,8 +154,12 @@ subrangeType
    ;
 
 typeIdentifier
-   : identifier
-   | (CHAR | BOOLEAN | INTEGER | REAL | STRING)
+   : identifier   # ident
+   | CHAR         # charType
+   | BOOLEAN      # boolType
+   | INTEGER      # intType
+   | REAL         # realType
+   | STRING       # stringType
    ;
 
 structuredType
