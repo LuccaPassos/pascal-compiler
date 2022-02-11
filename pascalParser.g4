@@ -95,11 +95,11 @@ unsignedNumber
    ;
 
 unsignedInteger
-   : NUM_INT
+   : NUM_INT   # exprIntVal
    ;
 
 unsignedReal
-   : NUM_REAL
+   : NUM_REAL  # exprRealVal
    ;
 
 sign
@@ -108,8 +108,8 @@ sign
    ;
 
 bool_
-   : TRUE
-   | FALSE
+   : TRUE   # exprBoolVal
+   | FALSE  # exprBoolVal
    ;
 
 string
@@ -159,7 +159,7 @@ typeIdentifier
    | BOOLEAN      # boolType
    | INTEGER      # intType
    | REAL         # realType
-   | STRING       # stringType
+   | STRING       # strType
    ;
 
 structuredType
