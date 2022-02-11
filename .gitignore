@@ -24,4 +24,7 @@ hs_err_pid*
 # compiled parser files
 parser
 bin
-.antl/
+.antlr/
+
+# ide files/folders
+.vscode/
