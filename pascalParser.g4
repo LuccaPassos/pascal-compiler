@@ -77,7 +77,7 @@ constantDefinition
    ;
 
 constantChr
-   : CHR LPAREN unsignedInteger RPAREN
+   : CHR LPAREN unsignedInteger RPAREN # exprCharVal
    ;
 
 constant
@@ -324,13 +324,13 @@ expression
    ;
 
 relationaloperator
-   : EQUAL
-   | NOT_EQUAL
-   | LT
-   | LE
-   | GE
-   | GT
-   | IN
+   : op=EQUAL
+   | op=NOT_EQUAL
+   | op=LT
+   | op=LE
+   | op=GE
+   | op=GT
+   | op=IN
    ;
 
 simpleExpression
@@ -338,9 +338,9 @@ simpleExpression
    ;
 
 additiveoperator
-   : PLUS
-   | MINUS
-   | OR
+   : op=PLUS
+   | op=MINUS
+   | op=OR
    ;
 
 term
@@ -348,11 +348,11 @@ term
    ;
 
 multiplicativeoperator
-   : STAR
-   | SLASH
-   | DIV
-   | MOD
-   | AND
+   : op=STAR
+   | op=SLASH
+   | op=DIV
+   | op=MOD
+   | op=AND
    ;
 
 signedFactor
