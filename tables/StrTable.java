@@ -7,14 +7,15 @@ import java.util.Formatter;
 // FIXME: this should be a hash
 public final class StrTable extends ArrayList<String>{
 
-    @Override
-    public boolean add(String s) {
-		for (int i = 0; i < this.size(); i++) {
+    public int addStr(String s) {
+		int i;
+		for (i = 0; i < this.size(); i++) {
 			if (this.get(i).equals(s)) {
-				return false;
+				return i;
 			}
 		}
-		return super.add(s);
+		super.add(s);
+		return i;
 	}
 
 	public String toString() {
