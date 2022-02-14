@@ -391,8 +391,15 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	public AST visitIfStatement(pascalParser.IfStatementContext ctx) {
 		AST expressionNode = visit(ctx.expression());
 		checkBoolExpr(ctx.IF().getSymbol().getLine(), "IF", expressionNode.type);
+
+		AST thenNode = visit(ctx.statement(0));
 		
-		return null;
+		if (ctx.ELSE() != null) {
+			AST elseNode = visit(ctx.statement(1));
+			return AST.newSubtree(NodeKind.IF_NODE, NO_TYPE, expressionNode, thenNode, elseNode);
+		}
+		
+		return AST.newSubtree(NodeKind.IF_NODE, NO_TYPE, expressionNode, thenNode);
 	}
 
 	@Override
@@ -425,22 +432,21 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	}
 
 	@Override
-	public AST visitBlock(pascalParser.BlockContext ctx) {
+	public AST visitCompoundStatement(pascalParser.CompoundStatementContext ctx) {
 		AST node = AST.newSubtree(NodeKind.BLOCK_NODE, Type.NO_TYPE);
-		List<StatementContext> statementsSections = ctx.compoundStatement().statements().statement();
+		List<StatementContext> statementsSections = ctx.statements().statement();
 		for (int i = 0; i < statementsSections.size()-1; i++) {
 			AST child = visit(statementsSections.get(i));
-			System.out.println(child);
 			node.addChild(child);
 		}
 		return node;
 	}
 
 	@Override
-	public AST visitProgram(pascalParser.ProgramContext ctx) {
+	public AST visitBlock(pascalParser.BlockContext ctx) {
 
 		AST varsSection = AST.newSubtree(NodeKind.VAR_LIST_NODE, Type.NO_TYPE);
-		List<VariableDeclarationPartContext> varsSections= ctx.block().variableDeclarationPart();
+		List<VariableDeclarationPartContext> varsSections= ctx.variableDeclarationPart();
 		for (int i = 0; i < varsSections.size(); i++) {
 			AST varsSubSection = visit(varsSections.get(i));
 			for (int j = 0; j < varsSubSection.getChildrenSize(); j++) {
@@ -448,9 +454,15 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			}
 		}
 
-		AST statementsSection = visit(ctx.block());
+		AST statementsSection = visit(ctx.compoundStatement());
 
-		this.root = AST.newSubtree(NodeKind.PROGRAM_NODE, Type.NO_TYPE, varsSection, statementsSection);
+		AST node = AST.newSubtree(NodeKind.PROGRAM_NODE, Type.NO_TYPE, varsSection, statementsSection);
+		return node;
+	}
+
+	@Override
+	public AST visitProgram(pascalParser.ProgramContext ctx) {
+		this.root = visit(ctx.block());
 		return this.root;
 	}
 	
