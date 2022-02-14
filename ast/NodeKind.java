@@ -36,11 +36,6 @@ public enum NodeKind {
             return "<=";
         }
     },
-    STMTS_NODE {
-		public String toString() {
-            return "statements";
-        }
-	},
     BLOCK_NODE {
 		public String toString() {
             return "block";
@@ -131,6 +126,16 @@ public enum NodeKind {
             return "var_list";
         }
 	},
+    FUN_LIST_NODE {
+		public String toString() {
+            return "fun_list";
+        }
+	},
+    FUN_DECL_NODE {
+		public String toString() {
+            return "fun_decl";
+        }
+	},
     VAR_USE_NODE {
 		public String toString() {
             return "var_use";
@@ -191,6 +196,7 @@ public enum NodeKind {
 	        case STR_VAL_NODE:
             case CHAR_VAL_NODE:
 	        case VAR_DECL_NODE:
+            case FUN_DECL_NODE:
 	        case VAR_USE_NODE:
 	            return true;
 	        default:

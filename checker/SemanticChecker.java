@@ -7,6 +7,7 @@ import static typing.Type.REAL_TYPE;
 import static typing.Type.STR_TYPE;
 import static typing.Type.CHAR_TYPE;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.antlr.v4.misc.Graph.Node;
@@ -16,12 +17,15 @@ import ast.AST;
 import ast.NodeKind;
 import parser.pascalParser;
 import parser.pascalParser.ExprStrValContext;
+import parser.pascalParser.FormalParameterSectionContext;
 import parser.pascalParser.IdentifierContext;
+import parser.pascalParser.ProcedureAndFunctionDeclarationPartContext;
 import parser.pascalParser.StatementContext;
 import parser.pascalParser.VariableDeclarationPartContext;
 import parser.pascalParserBaseVisitor;
 import tables.StrTable;
 import tables.VarTable;
+import tables.FunTable;
 import typing.Type;
 import typing.Conv;
 import typing.Conv.Unif;
@@ -30,8 +34,10 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 	private StrTable st = new StrTable();
     private VarTable vt = new VarTable();
+	private FunTable ft = new FunTable();
     
     Type lastDeclType;
+	VarTable lastScope;
 
 	AST root;
 
@@ -39,32 +45,60 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
     AST checkVar(Token token) {
     	String text = token.getText();
     	int line = token.getLine();
-   		int idx = vt.lookupVar(text);
+   		int idx = lastScope.lookupVar(text);
     	if (idx == -1) {
-    		System.err.printf(
+    		System.out.printf(
     			"SEMANTIC ERROR (%d): variable '%s' was not declared.\n",
 				line, text);
 			System.exit(1);
             return null;
         }
 
-		return new AST(NodeKind.VAR_USE_NODE, idx, vt.getType(idx));
+		return new AST(NodeKind.VAR_USE_NODE, idx, lastScope.getType(idx));
     }
     
     // Creates a new variable with name `token`.
     AST newVar(Token token) {
     	String text = token.getText();
     	int line = token.getLine();
-   		int idx = vt.lookupVar(text);
+   		int idx = lastScope.lookupVar(text);
         if (idx != -1) {
-        	System.err.printf(
+        	System.out.printf(
     			"SEMANTIC ERROR (%d): variable '%s' already declared at line %d.\n",
-                line, text, vt.getLine(idx));
+                line, text, lastScope.getLine(idx));
 			System.exit(1);
             return null;
         }
-        idx = vt.addVar(text, line, lastDeclType);
+        idx = lastScope.addVar(text, line, lastDeclType);
 		return new AST(NodeKind.VAR_DECL_NODE, idx, lastDeclType);
+    }
+
+	AST newParameter(String functionName, Token token) {
+		int idx = ft.lookupFun(functionName);
+		ft.addParam(idx, lastDeclType);
+
+		return newVar(token);
+	}
+
+	AST newFunction(Token token) {
+		String functionName = token.getText();
+    	int line = token.getLine();
+   		int idx = ft.lookupFun(functionName);
+        if (idx != -1) {
+        	System.out.printf(
+    			"SEMANTIC ERROR (%d): function '%s' already declared at line %d.\n",
+                line, functionName, line);
+			System.exit(1);
+            return null;
+        }
+		idx = ft.addFun(functionName, line, this.lastDeclType);
+		this.lastScope = ft.getScope(idx);
+
+		AST functionNode = new AST(NodeKind.FUN_DECL_NODE, idx, lastDeclType);
+		AST parameterListNode = AST.newSubtree(NodeKind.VAR_LIST_NODE, NO_TYPE, newVar(token));
+		functionNode.addChild(parameterListNode);
+		
+		return functionNode;
     }
 
 	// Catch a type error
@@ -118,17 +152,19 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
         }
     }
     
-    // Show literal and variable table contents.
+    // Show literal, variable and function table contents.
     void printTables() {
         System.out.print("\n\n");
         System.out.print(st);
         System.out.print("\n\n");
     	System.out.print(vt);
     	System.out.print("\n\n");
+		System.out.print(ft);
+		System.out.print("\n\n");
     }
 
     void printAST() {
-    	AST.printDot(root, vt);
+    	AST.printDot(root, vt, ft);
     }
 
 	@Override
@@ -435,7 +471,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 	@Override
 	public AST visitCompoundStatement(pascalParser.CompoundStatementContext ctx) {
-		AST node = AST.newSubtree(NodeKind.STMTS_NODE, Type.NO_TYPE);
+		AST node = AST.newSubtree(NodeKind.BLOCK_NODE, Type.NO_TYPE);
 		List<StatementContext> statementsSections = ctx.statements().statement();
 		for (int i = 0; i < statementsSections.size()-1; i++) {
 			AST child = visit(statementsSections.get(i));
@@ -445,26 +481,73 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	}
 
 	@Override
+	public AST visitFunctionDeclaration(pascalParser.FunctionDeclarationContext ctx) {
+
+		visit(ctx.resultType());
+		AST functionNode = newFunction(ctx.identifier().IDENT().getSymbol());
+
+		AST parameterListNode = functionNode.getChild(0);
+		List<FormalParameterSectionContext> formalParameterList = ctx.formalParameterList().formalParameterSection();
+		for (int i = 0; i < formalParameterList.size(); i++) {
+			// All parameters in parameterGroup should have same type
+			visit(formalParameterList.get(i).parameterGroup().typeIdentifier());
+			
+			List<IdentifierContext> identifiers = formalParameterList.get(i).parameterGroup().identifierList().identifier();
+			
+			// There can be more than one declaration per type
+			for (int j = 0; j < identifiers.size(); j++) {
+				Token token = identifiers.get(j).IDENT().getSymbol();
+				parameterListNode.addChild(newParameter(ctx.identifier().IDENT().getText(), token));
+			}
+		}
+
+		AST blockNode = visit(ctx.block());
+		AST variableListNode = blockNode.getChild(0);
+		AST statementNode = blockNode.getChild(2);
+
+		for (int i = 0; i < variableListNode.getChildrenSize(); i++) {
+			parameterListNode.addChild(variableListNode.getChild(i));
+		}
+		functionNode.addChild(statementNode);
+
+		return functionNode;
+	}
+
+	@Override
 	public AST visitBlock(pascalParser.BlockContext ctx) {
 
-		AST varsSection = AST.newSubtree(NodeKind.VAR_LIST_NODE, Type.NO_TYPE);
+		AST varsSectionNode = AST.newSubtree(NodeKind.VAR_LIST_NODE, Type.NO_TYPE);
 		List<VariableDeclarationPartContext> varsSections= ctx.variableDeclarationPart();
 		for (int i = 0; i < varsSections.size(); i++) {
 			AST varsSubSection = visit(varsSections.get(i));
 			for (int j = 0; j < varsSubSection.getChildrenSize(); j++) {
-				varsSection.addChild(varsSubSection.getChild(j));
+				varsSectionNode.addChild(varsSubSection.getChild(j));
 			}
 		}
 
-		AST statementsSection = visit(ctx.compoundStatement());
+		AST statementsSectionNode = visit(ctx.compoundStatement());
 
-		AST node = AST.newSubtree(NodeKind.BLOCK_NODE, Type.NO_TYPE, varsSection, statementsSection);
+		VarTable scope = lastScope;
+
+		AST functionsSectionNode = AST.newSubtree(NodeKind.FUN_LIST_NODE, NO_TYPE);
+		List<ProcedureAndFunctionDeclarationPartContext> functionsSectionList = ctx.procedureAndFunctionDeclarationPart();
+		for (int i = 0; i < functionsSectionList.size(); i++) {
+			AST functionNode = visit(functionsSectionList.get(i).procedureOrFunctionDeclaration().functionDeclaration());
+			functionsSectionNode.addChild(functionNode);
+		}
+
+		lastScope = scope;
+
+		AST node = AST.newSubtree(NodeKind.BLOCK_NODE, Type.NO_TYPE, varsSectionNode, functionsSectionNode, statementsSectionNode);
 		return node;
 	}
 
 	@Override
 	public AST visitProgram(pascalParser.ProgramContext ctx) {
-		this.root = visit(ctx.block());
+		this.lastScope = vt;
+		AST blockNode = visit(ctx.block());
+		this.root = AST.newSubtree(NodeKind.PROGRAM_NODE, NO_TYPE, blockNode.getChild(0), blockNode.getChild(1), blockNode.getChild(2));
+
 		return this.root;
 	}
 	

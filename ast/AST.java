@@ -5,6 +5,7 @@ import static typing.Type.NO_TYPE;
 import java.util.ArrayList;
 import java.util.List;
 
+import tables.FunTable;
 import tables.VarTable;
 import typing.Type;
 
@@ -54,6 +55,8 @@ public class AST {
 
 	private static int nr;
 	private static VarTable vt;
+	private static FunTable ft;
+	private static VarTable scope;
 
 	private int printNodeDot() {
 		int myNr = nr++;
@@ -62,9 +65,10 @@ public class AST {
 	    if (this.type != NO_TYPE) {
 	    	System.err.printf("(%s) ", this.type.toString());
 	    }
-	    if (this.kind == NodeKind.VAR_DECL_NODE || this.kind == NodeKind.VAR_USE_NODE) {
-	    	System.err.printf("%s@", vt.getName(this.intData));
-	    } else {
+	    if (this.kind == NodeKind.VAR_DECL_NODE || this.kind == NodeKind.VAR_USE_NODE || this.kind == NodeKind.FUN_DECL_NODE) {
+	    	System.err.printf("%s@", scope.getName(this.intData));
+	    }
+		else {
 	    	System.err.printf("%s", this.kind.toString());
 	    }
 	    if (NodeKind.hasData(this.kind)) {
@@ -79,15 +83,20 @@ public class AST {
 	    System.err.printf("\"];\n");
 
 	    for (int i = 0; i < this.children.size(); i++) {
+			VarTable lastScope = scope;
+			if (this.children.get(i).kind == NodeKind.FUN_DECL_NODE) scope = ft.getScope(i);
 	        int childNr = this.children.get(i).printNodeDot();
+			scope = lastScope;
 	        System.err.printf("node%d -> node%d;\n", myNr, childNr);
 	    }
 	    return myNr;
 	}
 
-	public static void printDot(AST tree, VarTable table) {
+	public static void printDot(AST tree, VarTable variableTable, FunTable functionTable) {
 	    nr = 0;
-	    vt = table;
+	    vt = variableTable;
+		ft = functionTable;
+		scope = vt;
 	    System.err.printf("digraph {\ngraph [ordering=\"out\"];\n");
 	    tree.printNodeDot();
 	    System.err.printf("}\n");
