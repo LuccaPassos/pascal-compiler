@@ -433,7 +433,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 	@Override
 	public AST visitCompoundStatement(pascalParser.CompoundStatementContext ctx) {
-		AST node = AST.newSubtree(NodeKind.BLOCK_NODE, Type.NO_TYPE);
+		AST node = AST.newSubtree(NodeKind.STMTS_NODE, Type.NO_TYPE);
 		List<StatementContext> statementsSections = ctx.statements().statement();
 		for (int i = 0; i < statementsSections.size()-1; i++) {
 			AST child = visit(statementsSections.get(i));
@@ -456,7 +456,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 		AST statementsSection = visit(ctx.compoundStatement());
 
-		AST node = AST.newSubtree(NodeKind.PROGRAM_NODE, Type.NO_TYPE, varsSection, statementsSection);
+		AST node = AST.newSubtree(NodeKind.BLOCK_NODE, Type.NO_TYPE, varsSection, statementsSection);
 		return node;
 	}
 
