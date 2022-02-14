@@ -79,6 +79,14 @@ public class SemanticChecker extends pascalParserBaseVisitor<Type> {
 		// CHAR := CHAR
 		if (l == CHAR_TYPE  && r != CHAR_TYPE)  typeError(lineNo, ":=", l, r);
 	}
+
+	private void checkBoolExpr(int lineNo, String cmd, Type t) {
+        if (t != BOOL_TYPE) {
+            System.out.printf("SEMANTIC ERROR (%d): conditional expression in '%s' is '%s' instead of '%s'.\n",
+               lineNo, cmd, t.toString(), BOOL_TYPE.toString());
+            passed = false;
+        }
+    }
     
     // Return true if all tests passed.
     boolean hasPassed() {
@@ -257,6 +265,21 @@ public class SemanticChecker extends pascalParserBaseVisitor<Type> {
 		checkAssign(token.getLine(), identifierType, expressionType);
 		return NO_TYPE;
 	}
+
+	@Override
+	public Type visitIfStatement(pascalParser.IfStatementContext ctx) {
+		Type expressionType = visit(ctx.expression());
+		checkBoolExpr(ctx.IF().getSymbol().getLine(), "IF", expressionType);
+		return NO_TYPE;
+	}
+
+	@Override
+	public Type visitWhileStatement(pascalParser.WhileStatementContext ctx) {
+		Type expressionType = visit(ctx.expression());
+		checkBoolExpr(ctx.WHILE().getSymbol().getLine(), "WHILE", expressionType);
+		return NO_TYPE;
+	}
+
 	
 	@Override
 	public Type visitVariable(pascalParser.VariableContext ctx) {
