@@ -406,7 +406,9 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	public AST visitWhileStatement(pascalParser.WhileStatementContext ctx) {
 		AST expressionNode = visit(ctx.expression());
 		checkBoolExpr(ctx.WHILE().getSymbol().getLine(), "WHILE", expressionNode.type);
-		return null;
+
+		AST statementNode = visit(ctx.statement());
+		return AST.newSubtree(NodeKind.REPEAT_NODE, NO_TYPE, expressionNode, statementNode);
 	}
 
 	
