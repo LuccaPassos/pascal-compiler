@@ -48,9 +48,9 @@ public enum Type {
 
 	private static Type andOr[][] = {
 			/*INT*/	 	/*REAL*/ /*BOOL*/ 	/*STR*/   /*CHAR*/
-	/*INT*/ { INT_TYPE, NO_TYPE, INT_TYPE,  NO_TYPE,  NO_TYPE },
+	/*INT*/ { INT_TYPE, NO_TYPE, NO_TYPE,   NO_TYPE,  NO_TYPE },
 	/*REAL*/{ NO_TYPE,  NO_TYPE, NO_TYPE,   NO_TYPE,  NO_TYPE },
-	/*BOOL*/{ INT_TYPE, NO_TYPE, BOOL_TYPE, NO_TYPE,  NO_TYPE },
+	/*BOOL*/{ NO_TYPE,  NO_TYPE, BOOL_TYPE, NO_TYPE,  NO_TYPE },
 	/*STR*/ { NO_TYPE,  NO_TYPE, NO_TYPE,   NO_TYPE,  NO_TYPE },
 	/*CHAR*/{ NO_TYPE,  NO_TYPE, NO_TYPE,   NO_TYPE,  NO_TYPE }
 	};
