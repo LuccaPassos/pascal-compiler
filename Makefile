@@ -21,6 +21,10 @@ BIN_PATH=bin
 # Directory for the test cases
 DATA=$(ROOT)/tests
 IN=$(DATA)/in
+OUT=$(DATA)/cp2/out
+
+FILE=
+OUT_FILE = $(OUT)/$(basename $(notdir $(FILE))).dot
 
 all: antlr javac
 	@echo "Done."
@@ -32,6 +36,12 @@ javac:
 	@rm -rf $(BIN_PATH)
 	@mkdir $(BIN_PATH)
 	$(JAVAC) $(CLASS_PATH_OPTION) -d $(BIN_PATH) */*.java
+
+$(OUT_FILE) dot:
+	@mkdir -p $(OUT)
+	
+	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) 2> $(OUT_FILE)
+	@dot -Tpng $(OUT_FILE) -o $(basename $(OUT_FILE)).png 
 
 run:
 	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE)

@@ -26,5 +26,8 @@ parser
 bin
 .antlr/
 
+# outputs
+out/
+
 # ide files/folders
 .vscode/

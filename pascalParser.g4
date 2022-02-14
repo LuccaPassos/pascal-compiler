@@ -108,8 +108,8 @@ sign
    ;
 
 bool_
-   : TRUE   # exprBoolVal
-   | FALSE  # exprBoolVal
+   : TRUE   # exprTrue
+   | FALSE  # exprFalse
    ;
 
 string

@@ -29,10 +29,9 @@ public class Main {
 		SemanticChecker checker = new SemanticChecker();
 		checker.visit(tree);
 
-		if (checker.hasPassed()) {
-			System.out.println("PARSE SUCCESSFUL!");
-			checker.printTables();
-		}
+		System.out.println("PARSE SUCCESSFUL!");
+		checker.printTables();
+		checker.printAST();
 	}
 
 }
