@@ -73,6 +73,21 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		return new AST(NodeKind.VAR_DECL_NODE, idx, lastDeclType);
     }
 
+	AST checkFunction(Token token) {
+		String functionName = token.getText();
+		int line = token.getLine();
+		int idx = ft.lookupFun(functionName);
+		if (idx == -1) {
+        	System.out.printf(
+    			"SEMANTIC ERROR (%d): function '%s' was not declared.\n",
+                line, functionName);
+			System.exit(1);
+            return null;
+        }
+		
+		return new AST(NodeKind.FUN_USE_NODE, idx, ft.getType(idx));
+	}
+
 	AST newParameter(String functionName, Token token) {
 		int idx = ft.lookupFun(functionName);
 		ft.addParam(idx, lastDeclType);
@@ -108,35 +123,24 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		System.exit(1);
 	}
 
-	// Check if the assignment is valid
-	private AST checkAssign(int lineNo, AST left, AST right) {
-		Type leftType = left.type;
-		Type rightType = right.type;
+	// Catch a parameter type error
+	private void paramTypeError(Token token, int i, Type expected, Type got) {
+		String functionName = token.getText();
+		int line = token.getLine();
 
-		// BOOL := BOOL
-		if (leftType == BOOL_TYPE && rightType != BOOL_TYPE)
-			typeError(lineNo, ":=", leftType, rightType);
+		System.out.printf("SEMANTIC ERROR (%d): incompatible types for parameter %d of function '%s'. Expected %s but got %s.\n",
+				line, i, functionName, expected.toString(), got.toString());
+		System.exit(1);
+	}
 
-		// STR := STR || STR := CHAR
-		if (leftType == STR_TYPE) {
-			if (rightType == CHAR_TYPE) {
-				right = Conv.createConvNode(Conv.C2S, right);
-			} else if (rightType != STR_TYPE) {
-				typeError(lineNo, ":=", leftType, rightType);
-			}
-		}
+	private void paramQuantityError(Token token, int expected, int got) {
+		String functionName = token.getText();
+		int line = token.getLine();
 
-		// INT := INT
-		if (leftType == INT_TYPE  && rightType != INT_TYPE)  typeError(lineNo, ":=", leftType, rightType);
-
-		// REAL := REAL || REAL := INT
-		if (leftType == REAL_TYPE) {
-			if (rightType == INT_TYPE) {
-				right = Conv.createConvNode(Conv.I2R, right);
-			} else if (rightType != STR_TYPE) {
-				typeError(lineNo, ":=", leftType, rightType);
-			}
-		}
+		System.out.printf("SEMANTIC ERROR (%d): incompatible amount of parameters for function '%s'. Expected %d but got %d.\n",
+				line, functionName, expected, got);
+		System.exit(1);
+	}
 
 
 	private void checkBoolExpr(int lineNo, String cmd, Type t) {
@@ -245,6 +249,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	@Override
 	public AST visitFactor(pascalParser.FactorContext ctx) {
 
+		
 		if (ctx.variable() != null) {
 			return visit(ctx.variable());
 		}
@@ -252,9 +257,14 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		if (ctx.expression() != null) {
 			return visit(ctx.expression());
 		}
-
+		
 		if (ctx.unsignedConstant() != null) {
 			return visit(ctx.unsignedConstant());
+		}
+		
+		if (ctx.functionDesignator() != null) {
+			System.out.println("Factor");
+			return visit(ctx.functionDesignator());
 		}
 
 		if (ctx.factor() != null) {
@@ -486,6 +496,69 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	}
 
 	@Override
+	public AST visitFunctionDesignator(pascalParser.FunctionDesignatorContext ctx) {
+
+		Token token = ctx.identifier().IDENT().getSymbol();
+		AST functionDesignatorNode = checkFunction(token);
+		int idx = functionDesignatorNode.intData;
+
+		int expectedParameters = ft.getParametersSize(idx);
+		int gotParametes = ctx.parameterList().actualParameter().size();
+
+		if (gotParametes != expectedParameters) {
+			paramQuantityError(token, expectedParameters, gotParametes);
+		}
+
+		for (int i = 0; i < gotParametes; i++) {
+			AST parameterNode = visit(ctx.parameterList().actualParameter(i));
+			Type expected = ft.getType(idx);
+			Type got = parameterNode.type;
+			Unif unif = expected.unifyAssign(got);
+
+			if (unif.type == NO_TYPE) {
+				paramTypeError(token, i, expected, got);
+			}
+
+			parameterNode = Conv.createConvNode(unif.rc, parameterNode);
+			functionDesignatorNode.addChild(parameterNode);
+		}
+
+		
+		return functionDesignatorNode;
+	}
+
+	public AST visitProcedureStatement(pascalParser.ProcedureStatementContext ctx) {
+
+		Token token = ctx.identifier().IDENT().getSymbol();
+		AST procedureStatementNode = checkFunction(token);
+		int idx = procedureStatementNode.intData;
+
+		int expectedParameters = ft.getParametersSize(idx);
+		int gotParametes = ctx.parameterList().actualParameter().size();
+
+		if (gotParametes != expectedParameters) {
+			paramQuantityError(token, expectedParameters, gotParametes);
+		}
+
+		for (int i = 0; i < gotParametes; i++) {
+			AST parameterNode = visit(ctx.parameterList().actualParameter(i));
+			Type expected = ft.getType(procedureStatementNode.intData);
+			Type got = parameterNode.type;
+			Unif unif = expected.unifyAssign(got);
+
+			if (unif.type == NO_TYPE) {
+				paramTypeError(token, i, expected, got);
+			}
+
+			parameterNode = Conv.createConvNode(unif.rc, parameterNode);
+			
+			procedureStatementNode.addChild(parameterNode);
+		}
+
+		return procedureStatementNode;
+	}
+
+	@Override
 	public AST visitFunctionDeclaration(pascalParser.FunctionDeclarationContext ctx) {
 
 		visit(ctx.resultType());
@@ -530,8 +603,6 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			}
 		}
 
-		AST statementsSectionNode = visit(ctx.compoundStatement());
-
 		VarTable scope = lastScope;
 
 		AST functionsSectionNode = AST.newSubtree(NodeKind.FUN_LIST_NODE, NO_TYPE);
@@ -542,6 +613,8 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		}
 
 		lastScope = scope;
+
+		AST statementsSectionNode = visit(ctx.compoundStatement());
 
 		AST node = AST.newSubtree(NodeKind.BLOCK_NODE, Type.NO_TYPE, varsSectionNode, functionsSectionNode, statementsSectionNode);
 		return node;

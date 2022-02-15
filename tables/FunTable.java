@@ -46,6 +46,10 @@ public final class FunTable {
 		return table.get(i).type;
 	}
 
+	public int getParametersSize(int i) {
+		return table.get(i).parameters.size();
+	}
+
     public ArrayList<Type> getParameters(int i) {
 		return table.get(i).parameters;
 	}

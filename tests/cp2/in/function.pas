@@ -1,18 +1,30 @@
 program function_decl;
 
-function foo(a : integer) : integer;
+function foo(a, b : real; c : integer) : real;
 begin
-    foo := a;
+    if (c > 10) then
+        foo := a
+    else
+        foo := b;
 end;
 
-function bar(a, b : integer) : integer;
-var s : string;
+function bar(s : string) : string;
+var a, b, c : integer;
+var r : real;
 begin
-    s := ' ' + b;
-    bar := a;
+    a := 10;
+    b := 5;
+    c := a + 2*b;
+    r := foo(a, b, c);
+
+    s := s + c;
+    bar := s;
 end;
 
-var a : integer;
+var a, b : real;
+var s, t : string;
 begin
-    
+    foo(a, b, 15);
+    s := 'string';
+    t := bar(s);
 end.

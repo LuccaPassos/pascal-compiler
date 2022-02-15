@@ -136,6 +136,11 @@ public enum NodeKind {
             return "fun_decl";
         }
 	},
+    FUN_USE_NODE {
+        public String toString() {
+            return "fun_use";
+        }
+    },
     VAR_USE_NODE {
 		public String toString() {
             return "var_use";

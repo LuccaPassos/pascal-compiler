@@ -65,9 +65,12 @@ public class AST {
 	    if (this.type != NO_TYPE) {
 	    	System.err.printf("(%s) ", this.type.toString());
 	    }
-	    if (this.kind == NodeKind.VAR_DECL_NODE || this.kind == NodeKind.VAR_USE_NODE || this.kind == NodeKind.FUN_DECL_NODE) {
+	    if (this.kind == NodeKind.VAR_DECL_NODE || this.kind == NodeKind.VAR_USE_NODE) {
 	    	System.err.printf("%s@", scope.getName(this.intData));
 	    }
+		else if (this.kind == NodeKind.FUN_USE_NODE || this.kind == NodeKind.FUN_DECL_NODE) {
+			System.err.printf("%s@", ft.getName(this.intData));
+		}
 		else {
 	    	System.err.printf("%s", this.kind.toString());
 	    }
