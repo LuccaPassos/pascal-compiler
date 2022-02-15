@@ -138,11 +138,6 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			}
 		}
 
-		// CHAR := CHAR
-		if (leftType == CHAR_TYPE  && rightType != CHAR_TYPE)  typeError(lineNo, ":=", leftType, rightType);
-
-		return AST.newSubtree(NodeKind.ASSIGN_NODE, Type.NO_TYPE, left, right);
-	}
 
 	private void checkBoolExpr(int lineNo, String cmd, Type t) {
         if (t != BOOL_TYPE) {
@@ -416,11 +411,21 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	@Override
 	public AST visitAssignmentStatement(pascalParser.AssignmentStatementContext ctx) {
 		Token token = ctx.variable().identifier().get(0).IDENT().getSymbol();
-		AST identifierNode = checkVar(token);
+		AST leftNode = checkVar(token);
+		AST rightNode = visit(ctx.expression());
 
-		AST expressionNode = visit(ctx.expression());
+		Type leftType = leftNode.type;
+		Type rightType = rightNode.type;
+		Unif unif = leftType.unifyAssign(rightType);
 
-		return checkAssign(token.getLine(), identifierNode, expressionNode);
+		if (unif.type == NO_TYPE) {
+			typeError(token.getLine(), ":=", leftType, rightType);
+		}
+
+		leftNode = Conv.createConvNode(unif.lc, leftNode);
+		rightNode = Conv.createConvNode(unif.rc, rightNode);
+
+		return AST.newSubtree(NodeKind.ASSIGN_NODE, Type.NO_TYPE, leftNode, rightNode);
 	}
 
 	@Override
