@@ -527,9 +527,31 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		return functionDesignatorNode;
 	}
 
+	public AST readWriteCall(pascalParser.ProcedureStatementContext ctx) {
+		AST readNode;
+		
+		if (ctx.identifier().IDENT().getText().equals("read")) {
+			readNode = AST.newSubtree(NodeKind.READ_NODE, NO_TYPE);
+		} else {
+			readNode = AST.newSubtree(NodeKind.WRITE_NODE, NO_TYPE);
+		}
+
+		for (int i = 0; i < ctx.parameterList().actualParameter().size(); i++) {
+			AST parameterNode = visit(ctx.parameterList().actualParameter(i));
+			readNode.addChild(parameterNode);
+		}
+		
+		return readNode;
+	}
+
 	public AST visitProcedureStatement(pascalParser.ProcedureStatementContext ctx) {
 
 		Token token = ctx.identifier().IDENT().getSymbol();
+
+		if (token.getText().equals("read") || token.getText().equals("write")) {
+			return readWriteCall(ctx);
+		}
+		
 		AST procedureStatementNode = checkFunction(token);
 		int idx = procedureStatementNode.intData;
 
