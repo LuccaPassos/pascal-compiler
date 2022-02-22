@@ -40,7 +40,7 @@ javac:
 $(OUT_FILE) dot:
 	@mkdir -p $(OUT)
 	
-	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) 2> $(OUT_FILE)
+	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(OUT_FILE)
 	@dot -Tpng $(OUT_FILE) -o $(basename $(OUT_FILE)).png 
 
 run:

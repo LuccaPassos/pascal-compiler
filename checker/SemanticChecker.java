@@ -53,7 +53,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 		// If the variable doesn't exist
     	if (!exists) {
-    		System.out.printf(
+    		System.err.printf(
     			"SEMANTIC ERROR (%d): variable '%s' was not declared.\n",
 				line, variableName);
 			System.exit(1);
@@ -68,7 +68,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		String arrayName = token.getText();
 
 		if (arrayUseNode.type != Type.ARRAY_TYPE) {
-			System.out.printf(
+			System.err.printf(
     			"SEMANTIC ERROR (%d): cannot access index of type (%s).\n",
 				token.getLine(), arrayUseNode.type);
 			System.exit(1);
@@ -87,7 +87,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		
 		// If variable already exists
         if (exists) {
-        	System.out.printf(
+        	System.err.printf(
     			"SEMANTIC ERROR (%d): variable '%s' already declared at line %d.\n",
                 line, variableName, lastScope.getLine(variableName));
 			System.exit(1);
@@ -111,7 +111,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 		// If function doesn't exist
 		if (!exists) {
-        	System.out.printf(
+        	System.err.printf(
     			"SEMANTIC ERROR (%d): function '%s' was not declared.\n",
                 line, functionName);
 			System.exit(1);
@@ -134,7 +134,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 		// If function already exists
         if (exists) {
-        	System.out.printf(
+        	System.err.printf(
     			"SEMANTIC ERROR (%d): function '%s' already declared at line %d.\n",
                 line, functionName, line);
 			System.exit(1);
@@ -152,7 +152,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 	// Catch a type error
 	private void typeError(int lineNo, String op, Type t1, Type t2) {
-		System.out.printf("SEMANTIC ERROR (%d): incompatible types for operator '%s', LHS is '%s' and RHS is '%s'.\n",
+		System.err.printf("SEMANTIC ERROR (%d): incompatible types for operator '%s', LHS is '%s' and RHS is '%s'.\n",
 				lineNo, op, t1.toString(), t2.toString());
 		System.exit(1);
 	}
@@ -162,7 +162,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		String functionName = token.getText();
 		int line = token.getLine();
 
-		System.out.printf("SEMANTIC ERROR (%d): incompatible types for parameter %d of function '%s'. Expected %s but got %s.\n",
+		System.err.printf("SEMANTIC ERROR (%d): incompatible types for parameter %d of function '%s'. Expected %s but got %s.\n",
 				line, i, functionName, expected.toString(), got.toString());
 		System.exit(1);
 	}
@@ -171,7 +171,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		String functionName = token.getText();
 		int line = token.getLine();
 
-		System.out.printf("SEMANTIC ERROR (%d): incompatible amount of parameters for function '%s'. Expected %d but got %d.\n",
+		System.err.printf("SEMANTIC ERROR (%d): incompatible amount of parameters for function '%s'. Expected %d but got %d.\n",
 				line, functionName, expected, got);
 		System.exit(1);
 	}
@@ -179,7 +179,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 	private void checkBoolExpr(int lineNo, String cmd, Type t) {
         if (t != BOOL_TYPE) {
-            System.out.printf("SEMANTIC ERROR (%d): conditional expression in '%s' is '%s' instead of '%s'.\n",
+            System.err.printf("SEMANTIC ERROR (%d): conditional expression in '%s' is '%s' instead of '%s'.\n",
                lineNo, cmd, t.toString(), BOOL_TYPE.toString());
 			System.exit(1);
         }
@@ -187,13 +187,13 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
     
     // Show literal, variable and function table contents.
     void printTables() {
-        System.out.print("\n\n");
-        System.out.print(stringTable);
-        System.out.print("\n\n");
-    	System.out.print(variableTable);
-    	System.out.print("\n\n");
-		System.out.print(functionTable);
-		System.out.print("\n\n");
+        System.err.print("\n\n");
+        System.err.print(stringTable);
+        System.err.print("\n\n");
+    	System.err.print(variableTable);
+    	System.err.print("\n\n");
+		System.err.print(functionTable);
+		System.err.print("\n\n");
     }
 
     void printAST() {
@@ -248,7 +248,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			
 			int line = ctx.ARRAY().getSymbol().getLine();
 			if (low > high) {
-				System.out.printf(
+				System.err.printf(
 					"SEMANTIC ERROR (%d): Array range's 'low' (%d) value cannot be grater than 'high' (%d) value.\n",
 					line, low, high);
 					System.exit(1);
@@ -257,7 +257,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 			if (lowNode.type != INT_TYPE || highNode.type != INT_TYPE) {
 				Type type = lowNode.type != INT_TYPE ? lowNode.type : highNode.type;
-				System.out.printf(
+				System.err.printf(
 					"SEMANTIC ERROR (%d): Array's range cannot be of type %s, only integers allowed.\n",
 					line, type);
 				System.exit(1);
@@ -560,7 +560,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			int arrayDim = lastScope.getRangesSize(variableName);
 			int indexCount = ctx.expression().size();
 			if (arrayDim != indexCount) {
-				System.out.printf(
+				System.err.printf(
 					"SEMANTIC ERROR (%d): Indexing array with %d dimension%s, but %d given.\n",
 						token.getLine(), arrayDim, arrayDim > 1 ? "s" : "", indexCount);
 				System.exit(1);
@@ -571,7 +571,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 				AST expressionNode = visit(ctx.expression(i));
 
 				if (expressionNode.type != INT_TYPE) {
-					System.out.printf(
+					System.err.printf(
 						"SEMANTIC ERROR (%d): Indexing array with type %s. Only integers allowed.\n",
 							token.getLine(), expressionNode.type);
 					System.exit(1);
