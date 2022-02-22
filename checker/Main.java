@@ -12,7 +12,19 @@ import parser.pascalParser;
 
 public class Main {
 	public static void main(String[] args) throws IOException {
-		CharStream input = CharStreams.fromFileName(args[0]);
+
+		if (args.length == 0) {
+			System.err.printf("No files passed!\n");
+			System.exit(1);
+		}
+
+		CharStream input = null;
+		try {
+			input = CharStreams.fromFileName(args[0]);
+		} catch (Exception exception) {
+			System.err.printf("File '%s' does not exist!\n", args[0]);
+			System.exit(1);
+		}
 
 		pascalLexer lexer = new pascalLexer(input);
 
