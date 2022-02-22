@@ -587,17 +587,19 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		AST functionNode = newFunction(ctx.identifier().IDENT().getSymbol());
 
 		AST parameterListNode = functionNode.getChild(0);
-		List<FormalParameterSectionContext> formalParameterList = ctx.formalParameterList().formalParameterSection();
-		for (int i = 0; i < formalParameterList.size(); i++) {
-			// All parameters in parameterGroup should have same type
-			visit(formalParameterList.get(i).parameterGroup().typeIdentifier());
-			
-			List<IdentifierContext> identifiers = formalParameterList.get(i).parameterGroup().identifierList().identifier();
-			
-			// There can be more than one declaration per type
-			for (int j = 0; j < identifiers.size(); j++) {
-				Token token = identifiers.get(j).IDENT().getSymbol();
-				parameterListNode.addChild(newParameter(ctx.identifier().IDENT().getText(), token));
+		if (ctx.formalParameterList() != null) {
+			List<FormalParameterSectionContext> formalParameterList = ctx.formalParameterList().formalParameterSection();
+			for (int i = 0; i < formalParameterList.size(); i++) {
+				// All parameters in parameterGroup should have same type
+				visit(formalParameterList.get(i).parameterGroup().typeIdentifier());
+				
+				List<IdentifierContext> identifiers = formalParameterList.get(i).parameterGroup().identifierList().identifier();
+				
+				// There can be more than one declaration per type
+				for (int j = 0; j < identifiers.size(); j++) {
+					Token token = identifiers.get(j).IDENT().getSymbol();
+					parameterListNode.addChild(newParameter(ctx.identifier().IDENT().getText(), token));
+				}
 			}
 		}
 

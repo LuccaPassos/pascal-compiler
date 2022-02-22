@@ -381,7 +381,7 @@ functionDesignator
    ;
 
 parameterList
-   : actualParameter (COMMA actualParameter)*
+   : (actualParameter)? (COMMA actualParameter)*
    ;
 
 set_
