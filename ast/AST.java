@@ -62,11 +62,27 @@ public class AST {
 		int myNr = nr++;
 
 	    System.err.printf("node%d[label=\"", myNr);
-	    if (this.type != NO_TYPE) {
+		if (this.type != NO_TYPE) {
 	    	System.err.printf("(%s) ", this.type.toString());
 	    }
 	    if (this.kind == NodeKind.VAR_DECL_NODE || this.kind == NodeKind.VAR_USE_NODE) {
-	    	System.err.printf("%s@", scope.getName(this.intData));
+			Type t = scope.getType(this.intData);
+			if (t == Type.ARRAY_TYPE && this.kind == NodeKind.VAR_DECL_NODE) {
+				System.err.printf("(%s) [",scope.getContentType(this.intData));
+
+				ArrayList<Integer[]> ranges = scope.getRanges(this.intData);
+				for (int i = 0; i < ranges.size(); i++) {
+					System.err.printf("%d..%d", ranges.get(i)[0], ranges.get(i)[1]);
+					if (i < ranges.size()-1) System.err.printf(", ");
+				}
+				System.err.printf("] %s@", scope.getName(this.intData));
+
+			} else if (t == Type.ARRAY_TYPE && this.kind == NodeKind.VAR_USE_NODE) {
+				System.err.printf("(%s) %s@",scope.getContentType(this.intData), scope.getName(this.intData));
+
+			} else {
+				System.err.printf("%s@", scope.getName(this.intData));
+			}
 	    }
 		else if (this.kind == NodeKind.FUN_USE_NODE || this.kind == NodeKind.FUN_DECL_NODE) {
 			System.err.printf("%s@", ft.getName(this.intData));

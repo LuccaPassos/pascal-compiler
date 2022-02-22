@@ -8,10 +8,12 @@ import static typing.Type.STR_TYPE;
 import static typing.Type.CHAR_TYPE;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.antlr.v4.misc.Graph.Node;
 import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.misc.Pair;
 
 import ast.AST;
 import ast.NodeKind;
@@ -37,7 +39,10 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	private FunTable ft = new FunTable();
     
     Type lastDeclType;
+	Type lastDeclContentType;
+	ArrayList<Integer[]> lastDeclRanges;
 	VarTable lastScope;
+	int lastOffset;
 
 	AST root;
 
@@ -56,6 +61,19 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 		return new AST(NodeKind.VAR_USE_NODE, idx, lastScope.getType(idx));
     }
+
+	AST arrayAccess(Token token) {
+		AST arrayUseNode = checkVar(token);
+		if (arrayUseNode.type != Type.ARRAY_TYPE) {
+			System.out.printf(
+    			"SEMANTIC ERROR (%d): cannot access index of type (%s).\n",
+				token.getLine(), arrayUseNode.type);
+			System.exit(1);
+            return null;
+		}
+		Type contentType = lastScope.getContentType(arrayUseNode.intData);
+		return AST.newSubtree(NodeKind.ARRAY_ACCESS, contentType, arrayUseNode);
+	}
     
     // Creates a new variable with name `token`.
     AST newVar(Token token) {
@@ -69,7 +87,12 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			System.exit(1);
             return null;
         }
-        idx = lastScope.addVar(text, line, lastDeclType);
+		if (lastDeclType == Type.ARRAY_TYPE) {
+			Collections.reverse(lastDeclRanges);
+			idx = lastScope.addVar(text, line, lastDeclContentType, lastDeclRanges);
+		} else {
+			idx = lastScope.addVar(text, line, lastDeclType);
+		}
 		return new AST(NodeKind.VAR_DECL_NODE, idx, lastDeclType);
     }
 
@@ -197,7 +220,55 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	}
 
 	@Override
+	public AST visitArrayType(pascalParser.ArrayTypeContext ctx) {
+		visit(ctx.componentType());
+		
+		List<pascalParser.IndexTypeContext> indicesContexts = ctx.typeList().indexType();
+		for (int i = 0; i < indicesContexts.size(); i++) {
+			List<pascalParser.ConstantContext> constants = ctx.typeList().indexType(i).simpleType().subrangeType().constant();
+		
+			AST lowNode = visit(constants.get(0));
+			int low = lowNode.intData;
+			if (constants.get(0).sign() != null && constants.get(0).sign().MINUS() != null) low = -low;
+			
+			AST highNode = visit(constants.get(1));
+			int high = highNode.intData;
+			if (constants.get(1).sign() != null && constants.get(1).sign().MINUS() != null) high = -high;
+			
+			int line = ctx.ARRAY().getSymbol().getLine();
+			if (low > high) {
+				System.out.printf(
+					"SEMANTIC ERROR (%d): Array range's 'low' (%d) value cannot be grater than 'high' (%d) value.\n",
+					line, low, high);
+					System.exit(1);
+				return null;
+			}
+
+			if (lowNode.type != INT_TYPE || highNode.type != INT_TYPE) {
+				Type type = lowNode.type != INT_TYPE ? lowNode.type : highNode.type;
+				System.out.printf(
+					"SEMANTIC ERROR (%d): Array's range cannot be of type %s, only integers allowed.\n",
+					line, type);
+				System.exit(1);
+				return null;
+			}
+			
+			if (lastDeclType != Type.ARRAY_TYPE) {
+				this.lastDeclContentType = this.lastDeclType;
+				this.lastDeclRanges = new ArrayList<Integer[]>();
+			}
+			Integer[] range = new Integer[2];
+			range[0] = low;
+			range[1] = high;
+			this.lastDeclRanges.add(range);
+		}
+		lastDeclType = Type.ARRAY_TYPE;
+		return null;
+	}
+
+	@Override
     public AST visitVariableDeclaration(pascalParser.VariableDeclarationContext ctx) {
+		this.lastDeclRanges = new ArrayList<Integer[]>();
     	visit(ctx.type_());
 		List<IdentifierContext> identifiers = ctx.identifierList().identifier();
 		AST node = AST.newSubtree(NodeKind.VAR_LIST_NODE, Type.NO_TYPE);
@@ -421,7 +492,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	@Override
 	public AST visitAssignmentStatement(pascalParser.AssignmentStatementContext ctx) {
 		Token token = ctx.variable().identifier().get(0).IDENT().getSymbol();
-		AST leftNode = checkVar(token);
+		AST leftNode = visit(ctx.variable());
 		AST rightNode = visit(ctx.expression());
 
 		Type leftType = leftNode.type;
@@ -468,6 +539,35 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 		// Check if the variable exists
 		Token token = ctx.identifier().get(0).IDENT().getSymbol();
+		System.out.println(token.getText());
+
+		// Array use
+		if (ctx.LBRACK(0) != null) {
+			AST arrayAccessNode = arrayAccess(token);
+			int arrayDim = lastScope.getRanges(arrayAccessNode.getChild(0).intData).size();
+			int indexCount = ctx.expression().size();
+			if (arrayDim != indexCount) {
+				System.out.printf(
+					"SEMANTIC ERROR (%d): Indexing array with %d dimension%s, but %d given.\n",
+						token.getLine(), arrayDim, arrayDim > 1 ? "s" : "", indexCount);
+				System.exit(1);
+				return null;
+			}
+			for (int i = 0; i < indexCount; i++) {
+				AST expressionNode = visit(ctx.expression(i));
+
+				if (expressionNode.type != INT_TYPE) {
+					System.out.printf(
+						"SEMANTIC ERROR (%d): Indexing array with type %s. Only integers allowed.\n",
+							token.getLine(), expressionNode.type);
+					System.exit(1);
+					return null;
+				}
+
+				arrayAccessNode.addChild(expressionNode);
+			}
+			return arrayAccessNode;
+		}
 
 		return checkVar(token);
 	}

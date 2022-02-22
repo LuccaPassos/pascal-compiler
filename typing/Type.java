@@ -34,7 +34,11 @@ public enum Type {
             return "char";
         }
 	},
-
+	ARRAY_TYPE {
+		public String toString() {
+            return "array";
+        }
+	},
 	NO_TYPE {
 		public String toString() {
 			return "noType";
@@ -51,7 +55,11 @@ public enum Type {
 	};
 
 	public Unif unifyAssign(Type that) {
-	return assign[this.ordinal()][that.ordinal()];
+		try {
+			return assign[this.ordinal()][that.ordinal()];
+		} catch (ArrayIndexOutOfBoundsException exception) {
+			return new Unif(NO_TYPE, NONE, NONE);
+		}
 	}
 
 	private static Unif plus[][] = {
@@ -64,7 +72,11 @@ public enum Type {
 	};
 	
 	public Unif unifyPlus(Type that) {
-		return plus[this.ordinal()][that.ordinal()];
+		try {
+			return plus[this.ordinal()][that.ordinal()];
+		} catch (ArrayIndexOutOfBoundsException exception) {
+			return new Unif(NO_TYPE, NONE, NONE);
+		}
 	}
 
 	private static Unif andOr[][] = {
@@ -77,7 +89,11 @@ public enum Type {
 	};
 
 	public Unif unifyAndOr(Type that) {
-	return andOr[this.ordinal()][that.ordinal()];
+		try {
+			return andOr[this.ordinal()][that.ordinal()];
+		} catch (ArrayIndexOutOfBoundsException exception) {
+			return new Unif(NO_TYPE, NONE, NONE);
+		}
 	}
 	
 	private static Unif other[][] = {
@@ -90,7 +106,11 @@ public enum Type {
 	};
 
 	public Unif unifyOtherArith(Type that) {
-	return other[this.ordinal()][that.ordinal()];
+		try {
+			return other[this.ordinal()][that.ordinal()];
+		} catch (ArrayIndexOutOfBoundsException exception) {
+			return new Unif(NO_TYPE, NONE, NONE);
+		}
 	}
 
 	private static Unif comp[][] = {
@@ -104,6 +124,10 @@ public enum Type {
 		
 
 	public Unif unifyComp(Type that) {
-		return comp[this.ordinal()][that.ordinal()];
+		try {
+			return comp[this.ordinal()][that.ordinal()];
+		} catch (ArrayIndexOutOfBoundsException exception) {
+			return new Unif(NO_TYPE, NONE, NONE);
+		}
 	}
 }

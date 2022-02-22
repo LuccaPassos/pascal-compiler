@@ -151,6 +151,11 @@ public enum NodeKind {
             return "write";
         }
 	},
+    ARRAY_ACCESS {
+        public String toString() {
+            return "array_acess";
+        }
+    },
 
     B2I_NODE { // Type conversion.
 		public String toString() {
