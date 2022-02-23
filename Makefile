@@ -20,7 +20,7 @@ BIN_PATH=bin
 
 # Directory for the test cases
 DATA=$(ROOT)/tests
-IN=$(DATA)/in
+IN=$(DATA)/cp2/in
 OUT=$(DATA)/cp2/out
 
 FILE=
@@ -50,7 +50,8 @@ run:
 runall:
 	@-for FILE in $(IN)/*.pas; do \
 	 	echo -e "\nRunning $${FILE}" && \
-	 	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $${FILE}; \
+		make dot FILE=$${FILE} \
+	 	# $(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $${FILE}; \
 	done;
 
 clean:
