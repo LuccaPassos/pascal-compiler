@@ -4,13 +4,13 @@ import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.HashMap;
 
+import scope.Scope;
 import typing.Type;
 
 public final class FunctionTable {
 	private HashMap<String, Function> table = new HashMap<String, Function>();
 
 	public FunctionTable() {
-		super();
 		this.table = new HashMap<String, Function>();
 	}
 
@@ -39,7 +39,7 @@ public final class FunctionTable {
         this.table.get(functionName).addParameter(type);
     }
 
-    public VariableTable getScope(String functionName) {
+    public Scope getScope(String functionName) {
         return this.table.get(functionName).getScope();
     }
 	
@@ -52,6 +52,8 @@ public final class FunctionTable {
 	}
 	
 	public String toString() {
+		if (table.size() == 0) return "";
+
 		StringBuilder stringBuilder = new StringBuilder();
 		Formatter formatter = new Formatter(stringBuilder);
 		formatter.format("Functions table:\n");
@@ -65,15 +67,15 @@ public final class FunctionTable {
 	
 	private final class Function extends Entry {
         ArrayList<Type> parameters;
-        VariableTable scope;
+        Scope scope;
 
 		Function(String name, int line, Type type) {
 			super(name, line, type);
             this.parameters = new ArrayList<Type>();
-            this.scope = new VariableTable();
+            this.scope = new Scope();
 		}
 
-		VariableTable getScope() {
+		Scope getScope() {
 			return this.scope;
 		}
 

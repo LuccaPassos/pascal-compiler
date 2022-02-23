@@ -6,6 +6,7 @@ import static typing.Type.NO_TYPE;
 import java.util.ArrayList;
 import java.util.List;
 
+import scope.Scope;
 import tables.FunctionTable;
 import tables.VariableTable;
 import typing.Type;
@@ -61,11 +62,12 @@ public class AST {
 	}
 
 	private static int nr;
-	private static FunctionTable functionTable;
-	private static VariableTable currentScope;
+	private static Scope currentScope;
 
 	private int printNodeDot() {
 		int myNr = nr++;
+		VariableTable variableTable = currentScope.getVaraibleTable();
+		FunctionTable functionTable = currentScope.getFunctionTable();
 
 		// Does the node have a type?
 	    System.out.printf("node%d[label=\"", myNr);
@@ -75,28 +77,28 @@ public class AST {
 
 		// What kind of node is it?
 	    if (this.kind == NodeKind.VAR_DECL_NODE || this.kind == NodeKind.VAR_USE_NODE) {
-			Type type = currentScope.getType(this.stringData);
+			Type type = variableTable.getType(this.stringData);
 			if (type == Type.ARRAY_TYPE && this.kind == NodeKind.VAR_DECL_NODE) {
-				System.out.printf("(%s) [",currentScope.getContentType(this.stringData));
+				System.out.printf("(%s) [", variableTable.getContentType(this.stringData));
 
-				ArrayList<Integer[]> ranges = currentScope.getRanges(this.stringData);
+				ArrayList<Integer[]> ranges = variableTable.getRanges(this.stringData);
 
 				int i = 0;
 				for (Integer[] range : ranges) {
 					System.out.printf("%d..%d", range[0], range[1]);
 					if (i++ < ranges.size() - 1) System.out.printf(", ");
 				}
-				System.out.printf("] %s@", currentScope.getName(this.stringData));
+				System.out.printf("] %s", variableTable.getName(this.stringData));
 
 			} else if (type == Type.ARRAY_TYPE && this.kind == NodeKind.VAR_USE_NODE) {
-				System.out.printf("(%s) %s@", currentScope.getContentType(this.stringData), this.stringData);
+				System.out.printf("(%s) %s", variableTable.getContentType(this.stringData), this.stringData);
 
 			} else {
-				System.out.printf("%s@", this.stringData);
+				System.out.printf("%s", this.stringData);
 			}
 	    }
 		else if (this.kind == NodeKind.FUN_USE_NODE || this.kind == NodeKind.FUN_DECL_NODE) {
-			System.out.printf("%s@", this.stringData);
+			System.out.printf("%s", this.stringData);
 		} else {
 	    	System.out.printf("%s", this.kind.toString());
 	    }
@@ -106,16 +108,16 @@ public class AST {
 	        if (this.kind == NodeKind.REAL_VAL_NODE) {
 	        	System.out.printf("%.2f", this.floatData);
 	        } else if (this.kind == NodeKind.STR_VAL_NODE) {
-	        	System.out.printf("@%d", this.intData);
-	        } else {
-	        	System.out.printf("%d", this.intData);
-	        }
+	        	System.out.printf("%s", this.stringData);
+	        } else if (this.kind == NodeKind.INT_VAL_NODE) {
+				System.out.printf("%d", this.intData);
+			}
 	    }
 
 	    System.out.printf("\"];\n");
 
 	    for (AST child : this.children) {
-			VariableTable lastScope = currentScope;
+			Scope lastScope = currentScope;
 
 			if (child.kind == FUN_DECL_NODE)
 				currentScope = functionTable.getScope(child.stringData);
@@ -128,10 +130,9 @@ public class AST {
 	    return myNr;
 	}
 
-	public static void printDot(AST tree, VariableTable variableTable, FunctionTable functionTable) {
+	public static void printDot(AST tree, Scope scope) {
 	    nr = 0;
-		AST.functionTable = functionTable;
-		currentScope = variableTable;
+		currentScope = scope;
 	    System.out.printf("digraph {\ngraph [ordering=\"out\"];\n");
 	    tree.printNodeDot();
 	    System.out.printf("}\n");

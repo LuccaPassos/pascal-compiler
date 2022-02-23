@@ -22,6 +22,7 @@ import parser.pascalParser.IdentifierContext;
 import parser.pascalParser.ProcedureAndFunctionDeclarationPartContext;
 import parser.pascalParser.StatementContext;
 import parser.pascalParser.VariableDeclarationPartContext;
+import scope.Scope;
 import parser.pascalParserBaseVisitor;
 import tables.StringTable;
 import tables.VariableTable;
@@ -33,23 +34,24 @@ import typing.Conv.Unif;
 public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 	private StringTable stringTable = new StringTable();
-    private VariableTable variableTable = new VariableTable();
-	private FunctionTable functionTable = new FunctionTable();
+
+	private Scope globalScope = new Scope();
+	private Scope currentScope;
     
     Type lastDeclType;
 	Type lastDeclContentType;
 	ArrayList<Integer[]> lastDeclRanges;
-	VariableTable lastScope;
 	int lastOffset;
 
 	AST root;
 
     // Check if token was declared or not.
     AST checkVariable(Token token) {
+		VariableTable variableTable = currentScope.getVaraibleTable();
 
     	String variableName = token.getText();
     	int line = token.getLine();
-   		boolean exists = lastScope.lookup(variableName);
+   		boolean exists = variableTable.lookup(variableName);
 
 		// If the variable doesn't exist
     	if (!exists) {
@@ -60,10 +62,12 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
             return null;
         }
 
-		return new AST(NodeKind.VAR_USE_NODE, variableName, lastScope.getType(variableName));
+		return new AST(NodeKind.VAR_USE_NODE, variableName, variableTable.getType(variableName));
     }
 
 	AST arrayAccess(Token token) {
+		VariableTable variableTable = currentScope.getVaraibleTable();
+
 		AST arrayUseNode = checkVariable(token);
 		String arrayName = token.getText();
 
@@ -75,36 +79,40 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
             return null;
 		}
 
-		Type contentType = lastScope.getContentType(arrayName);
+		Type contentType = variableTable.getContentType(arrayName);
 		return AST.newSubtree(NodeKind.ARRAY_ACCESS, contentType, arrayUseNode);
 	}
     
     // Creates a new variable with name `token`.
     AST newVariable(Token token) {
+		VariableTable variableTable = currentScope.getVaraibleTable();
+
     	String variableName = token.getText();
     	int line = token.getLine();
-   		boolean exists = lastScope.lookup(variableName);
+   		boolean exists = variableTable.lookup(variableName);
 		
 		// If variable already exists
         if (exists) {
         	System.err.printf(
     			"SEMANTIC ERROR (%d): variable '%s' already declared at line %d.\n",
-                line, variableName, lastScope.getLine(variableName));
+                line, variableName, variableTable.getLine(variableName));
 			System.exit(1);
             return null;
         }
 
 		if (lastDeclType == Type.ARRAY_TYPE) {
 			Collections.reverse(lastDeclRanges);
-			lastScope.addEntry(variableName, line, lastDeclContentType, lastDeclRanges);
+			variableTable.addEntry(variableName, line, lastDeclContentType, lastDeclRanges);
 		} else {
-			lastScope.addEntry(variableName, line, lastDeclType);
+			variableTable.addEntry(variableName, line, lastDeclType);
 		}
 
 		return new AST(NodeKind.VAR_DECL_NODE, variableName, lastDeclType);
     }
 
 	AST checkFunction(Token token) {
+		FunctionTable functionTable = currentScope.getFunctionTable();
+
 		String functionName = token.getText();
 		int line = token.getLine();
 		boolean exists = functionTable.lookup(functionName);
@@ -122,12 +130,16 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	}
 
 	AST newParameter(String functionName, Token token) {
+		FunctionTable functionTable = currentScope.getFunctionTable();
+
 		functionTable.addParameter(functionName, lastDeclType);
 
 		return newVariable(token);
 	}
 
 	AST newFunction(Token token) {
+		FunctionTable functionTable = currentScope.getFunctionTable();
+
 		String functionName = token.getText();
     	int line = token.getLine();
 		boolean exists = functionTable.lookup(functionName);
@@ -140,8 +152,8 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			System.exit(1);
             return null;
         }
-		functionTable.addEntry(functionName, line, this.lastDeclType);
-		this.lastScope = functionTable.getScope(functionName);
+		currentScope.getFunctionTable().addEntry(functionName, line, this.lastDeclType);
+		this.currentScope = functionTable.getScope(functionName);
 
 		AST functionNode = new AST(NodeKind.FUN_DECL_NODE, functionName, lastDeclType);
 		AST parameterListNode = AST.newSubtree(NodeKind.VAR_LIST_NODE, NO_TYPE, newVariable(token));
@@ -176,7 +188,6 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 		System.exit(1);
 	}
 
-
 	private void checkBoolExpr(int lineNo, String cmd, Type t) {
         if (t != BOOL_TYPE) {
             System.err.printf("SEMANTIC ERROR (%d): conditional expression in '%s' is '%s' instead of '%s'.\n",
@@ -190,14 +201,14 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
         System.err.print("\n\n");
         System.err.print(stringTable);
         System.err.print("\n\n");
-    	System.err.print(variableTable);
+    	System.err.print(currentScope.getVaraibleTable());
     	System.err.print("\n\n");
-		System.err.print(functionTable);
+		System.err.print(currentScope.getFunctionTable());
 		System.err.print("\n\n");
     }
 
     void printAST() {
-    	AST.printDot(root, variableTable, functionTable);
+    	AST.printDot(root, globalScope);
     }
 
 	@Override
@@ -547,6 +558,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	
 	@Override
 	public AST visitVariable(pascalParser.VariableContext ctx) {
+		VariableTable variableTable = currentScope.getVaraibleTable();
 
 		// Check if the variable exists
 		Token token = ctx.identifier().get(0).IDENT().getSymbol();
@@ -557,7 +569,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			AST arrayAccessNode = arrayAccess(token);
 
 			// Check if we are accessing the right amount of dimensions
-			int arrayDim = lastScope.getRangesSize(variableName);
+			int arrayDim = variableTable.getRangesSize(variableName);
 			int indexCount = ctx.expression().size();
 			if (arrayDim != indexCount) {
 				System.err.printf(
@@ -611,6 +623,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 	@Override
 	public AST visitFunctionDesignator(pascalParser.FunctionDesignatorContext ctx) {
+		FunctionTable functionTable = currentScope.getFunctionTable();
 
 		Token token = ctx.identifier().IDENT().getSymbol();
 		String functionName = token.getText();
@@ -661,6 +674,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 	}
 
 	public AST visitProcedureStatement(pascalParser.ProcedureStatementContext ctx) {
+		FunctionTable functionTable = currentScope.getFunctionTable();
 
 		Token token = ctx.identifier().IDENT().getSymbol();
 		String functionName = token.getText();
@@ -743,7 +757,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			}
 		}
 
-		VariableTable scope = lastScope;
+		Scope lastScope = this.currentScope;
 
 		AST functionsSectionNode = AST.newSubtree(NodeKind.FUN_LIST_NODE, NO_TYPE);
 		List<ProcedureAndFunctionDeclarationPartContext> functionsSectionList = ctx.procedureAndFunctionDeclarationPart();
@@ -752,7 +766,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 			functionsSectionNode.addChild(functionNode);
 		}
 
-		lastScope = scope;
+		this.currentScope = lastScope;
 
 		AST statementsSectionNode = visit(ctx.compoundStatement());
 
@@ -762,7 +776,7 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
 	@Override
 	public AST visitProgram(pascalParser.ProgramContext ctx) {
-		this.lastScope = variableTable;
+		this.currentScope = this.globalScope;
 		AST blockNode = visit(ctx.block());
 		this.root = AST.newSubtree(NodeKind.PROGRAM_NODE, NO_TYPE, blockNode.getChild(0), blockNode.getChild(1), blockNode.getChild(2));
 

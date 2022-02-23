@@ -19,7 +19,7 @@ public final class StringTable extends HashMap<String, Boolean>{
 		Formatter formatter = new Formatter(stringBuilder);
 		formatter.format("Strings table:\n");
 		for (String string : this.keySet()) {
-			formatter.format("%s\n", this.get(string));
+			formatter.format("%s\n", string);
 		}
 		formatter.close();
 		return stringBuilder.toString();

@@ -41,7 +41,7 @@ public class Main {
 		SemanticChecker checker = new SemanticChecker();
 		checker.visit(tree);
 
-		System.out.println("PARSE SUCCESSFUL!");
+		System.err.println("PARSE SUCCESSFUL!");
 		checker.printTables();
 		checker.printAST();
 	}
