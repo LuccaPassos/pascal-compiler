@@ -208,6 +208,7 @@ public enum NodeKind {
 	        case VAR_DECL_NODE:
             case FUN_DECL_NODE:
 	        case VAR_USE_NODE:
+            case FUN_USE_NODE:
 	            return true;
 	        default:
 	            return false;

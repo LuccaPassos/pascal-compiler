@@ -8,6 +8,7 @@ import tables.VariableTable;
 public class Scope {
     private VariableTable varaibleTable;
     private FunctionTable functionTable;
+    private Scope parentScope;
 
     public VariableTable getVaraibleTable() {
         return this.varaibleTable;
@@ -17,9 +18,21 @@ public class Scope {
         return this.functionTable;
     }
 
+    
+    public Scope(Scope parentScope) {
+        this.varaibleTable = new VariableTable();
+        this.functionTable = new FunctionTable();
+        this.parentScope = parentScope;
+    }
+
     public Scope() {
         this.varaibleTable = new VariableTable();
         this.functionTable = new FunctionTable();
+        this.parentScope = null;
+    }
+
+    public Scope getParentScope() {
+        return this.parentScope;
     }
 
     public String toString() {

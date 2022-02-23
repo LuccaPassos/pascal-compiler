@@ -9,49 +9,91 @@ import java.util.HashMap;
 import typing.*;
 
 public final class VariableTable {
-	protected HashMap<String, Variable> table;
+	private HashMap<String, Integer> table;
+	private ArrayList<Variable> variables;
 
 	public VariableTable() {
-		super();
-		this.table = new HashMap<String, Variable>();
+		this.table = new HashMap<>();
+		this.variables = new ArrayList<>();
 	}
 
-	public void addEntry(String name, int line, Type type) {
+	public int addEntry(String name, int line, Type type) {
         Variable entry = new Variable(name, line, type);
-        this.table.put(name, entry);
+		int index = this.variables.size();
+
+		this.variables.add(entry);
+        this.table.put(name, index);
+
+		return index;
     }
 
-	public boolean lookup(String name) {
-        return this.table.get(name) != null;
+	public int lookup(String name) {
+		Integer index = this.table.get(name);
+        return index != null ? index : -1;
     }
 	
 	public String getName(String name) {
-        return this.table.get(name).getName();
+		int index = this.table.get(name);
+        return this.variables.get(index).getName();
     }
 
-    public Type getType(String name) {
-        return this.table.get(name).getType();
-    }
-
-    public int getLine(String name) {
-        return this.table.get(name).getLine();
-    }
-
-	public void addEntry(String variableName, int line, Type contentType, ArrayList<Integer[]> range) {
-		Variable entry = new Variable(variableName, line, contentType, range);
-		this.table.put(variableName, entry);
+	public String getName(int index) {
+		return this.variables.get(index).getName();
 	}
 
-	public Type getContentType(String variableName) {
-		return table.get(variableName).getContentType();
+    public Type getType(String name) {
+        int index = this.table.get(name);
+		return this.variables.get(index).getType();
+    }
+
+	public Type getType(int index) {
+		return this.variables.get(index).getType();
+	}
+
+    public int getLine(String name) {
+        int index = this.table.get(name);
+		return this.variables.get(index).getLine();
+    }
+
+	public int getLine(int index) {
+		return this.variables.get(index).getLine();
+    }
+
+	public int addEntry(String variableName, int line, Type contentType, ArrayList<Integer[]> range) {
+		Variable entry = new Variable(variableName, line, contentType, range);
+		int index = this.variables.size();
+
+		this.variables.add(entry);
+		this.table.put(variableName, index);
+
+		return index;
+	}
+
+	public Type getContentType(String name) {
+		int index = this.table.get(name);
+		return this.variables.get(index).getContentType();
+	}
+
+	public Type getContentType(int index) {
+		return variables.get(index).getContentType();
 	}
 
 	public ArrayList<Integer[]> getRanges(String variableName) {
-		return table.get(variableName).getRanges();
+		int index = table.get(variableName);
+		return this.variables.get(index).getRanges();
+	}
+
+	public ArrayList<Integer[]> getRanges(int index) {
+		return variables.get(index).getRanges();
 	}
 
 	public int getRangesSize(String variableName) {
-		return table.get(variableName).getRangesSize();
+		int index = table.get(variableName);
+		return variables.get(index).getRangesSize();
+	}
+
+	public int getRangesSize(int index) {
+		return variables.get(index).getRangesSize();
 	}
 	
 	public String toString() {
@@ -59,20 +101,20 @@ public final class VariableTable {
 		Formatter formatter = new Formatter(stringBuilder);
 		formatter.format("Variables table:\n");
 		
-		for (Variable variable : table.values()) {
+		int index = 0;
+		for (Variable variable : variables) {
+			formatter.format("Entry %d -- Name: %s, line: %d, type: %s", index++, variable.getName(), variable.getLine(), variable.getType());
 			if (variable.getType() == ARRAY_TYPE) {
-				formatter.format("Name: %s, line: %d, type: %s, content type: %s, range: [", variable.getName(), variable.getLine(), variable.getType(), variable.getContentType());
-				
+				formatter.format(", content type: %s, range: [", variable.getContentType());
 				int i = 0;
 				for (Integer[] range : variable.getRanges()) {
 					formatter.format("%d..%d", range[0], range[1]);
 					if ((i++) < variable.getRanges().size() - 1) formatter.format(", ");
 				}
 
-				formatter.format("]\n");
-			} else {
-				formatter.format("Name: %s, line: %d, type: %s\n", variable.getName(), variable.getLine(), variable.getType());
+				formatter.format("]");
 			}
+			formatter.format("\n");
 		}
 
 		formatter.close();

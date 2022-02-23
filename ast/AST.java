@@ -14,15 +14,13 @@ import typing.Type;
 public class AST {
 
 	public  final NodeKind kind;
-	public	final String stringData;
 	public  final int intData;
 	public  final float floatData;
 	public  final Type type;
 	private final List<AST> children;
 
-	private AST(NodeKind kind, String stringData, int intData, float floatData, Type type) {
+	private AST(NodeKind kind, int intData, float floatData, Type type) {
 		this.kind = kind;
-		this.stringData = stringData;
 		this.intData = intData;
 		this.floatData = floatData;
 		this.type = type;
@@ -30,15 +28,11 @@ public class AST {
 	}
 
 	public AST(NodeKind kind, int intData, Type type) {
-		this(kind, null, intData, 0.0f, type);
+		this(kind, intData, 0.0f, type);
 	}
 
 	public AST(NodeKind kind, float floatData, Type type) {
-		this(kind, null, 0, floatData, type);
-	}
-
-	public AST(NodeKind kind, String stringData, Type type) {
-		this(kind, stringData, 0, 0.0f, type);
+		this(kind, 0, floatData, type);
 	}
 
 	public void addChild(AST child) {
@@ -77,28 +71,36 @@ public class AST {
 
 		// What kind of node is it?
 	    if (this.kind == NodeKind.VAR_DECL_NODE || this.kind == NodeKind.VAR_USE_NODE) {
-			Type type = variableTable.getType(this.stringData);
+			Type type = variableTable.getType(this.intData);
 			if (type == Type.ARRAY_TYPE && this.kind == NodeKind.VAR_DECL_NODE) {
-				System.out.printf("(%s) [", variableTable.getContentType(this.stringData));
+				System.out.printf("(%s) [", variableTable.getContentType(this.intData));
 
-				ArrayList<Integer[]> ranges = variableTable.getRanges(this.stringData);
+				ArrayList<Integer[]> ranges = variableTable.getRanges(this.intData);
 
 				int i = 0;
 				for (Integer[] range : ranges) {
 					System.out.printf("%d..%d", range[0], range[1]);
 					if (i++ < ranges.size() - 1) System.out.printf(", ");
 				}
-				System.out.printf("] %s", variableTable.getName(this.stringData));
+				System.out.printf("] %s@", variableTable.getName(this.intData));
 
 			} else if (type == Type.ARRAY_TYPE && this.kind == NodeKind.VAR_USE_NODE) {
-				System.out.printf("(%s) %s", variableTable.getContentType(this.stringData), this.stringData);
+				System.out.printf("(%s) %s@", variableTable.getContentType(this.intData), variableTable.getName(this.intData));
 
 			} else {
-				System.out.printf("%s", this.stringData);
+				System.out.printf("%s@",variableTable.getName(this.intData));
 			}
 	    }
 		else if (this.kind == NodeKind.FUN_USE_NODE || this.kind == NodeKind.FUN_DECL_NODE) {
-			System.out.printf("%s", this.stringData);
+			// Look for the function on higher scopes
+			String name = null;
+			Scope scope = currentScope;
+			while(name == null) {
+				FunctionTable currentFunctionTable = scope.getFunctionTable();
+				name = currentFunctionTable.getName(this.intData);
+				scope = scope.getParentScope();
+			}
+			System.out.printf("%s@", name);
 		} else {
 	    	System.out.printf("%s", this.kind.toString());
 	    }
@@ -108,8 +110,8 @@ public class AST {
 	        if (this.kind == NodeKind.REAL_VAL_NODE) {
 	        	System.out.printf("%.2f", this.floatData);
 	        } else if (this.kind == NodeKind.STR_VAL_NODE) {
-	        	System.out.printf("%s", this.stringData);
-	        } else if (this.kind == NodeKind.INT_VAL_NODE) {
+	        	System.out.printf("@%d", this.intData);
+	        } else {
 				System.out.printf("%d", this.intData);
 			}
 	    }
@@ -120,7 +122,7 @@ public class AST {
 			Scope lastScope = currentScope;
 
 			if (child.kind == FUN_DECL_NODE)
-				currentScope = functionTable.getScope(child.stringData);
+				currentScope = functionTable.getScope(child.intData);
 
 	        int childNr = child.printNodeDot();
 
