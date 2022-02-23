@@ -6,7 +6,7 @@ var
 
 begin
     str := 'Hello';
-    writeln('String Table');
+    write('String Table');
     another_str := 'Nice to see three entries in here\n';
 
 end.
