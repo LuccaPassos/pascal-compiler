@@ -33,9 +33,9 @@ import typing.Conv.Unif;
 
 public class SemanticChecker extends pascalParserBaseVisitor<AST> {
 
-	private StringTable stringTable = new StringTable();
+	public StringTable stringTable = new StringTable();
 
-	private Scope globalScope = new Scope();
+	public Scope globalScope = new Scope();
 	private Scope currentScope;
     
     Type lastDeclType;
@@ -219,6 +219,10 @@ public class SemanticChecker extends pascalParserBaseVisitor<AST> {
     void printAST() {
     	AST.printDot(root, globalScope);
     }
+
+	public AST getAST() {
+		return this.root;
+	}
 
 	@Override
     public AST visitBoolType(pascalParser.BoolTypeContext ctx) {
