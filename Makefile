@@ -43,6 +43,12 @@ $(OUT_FILE) dot:
 	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(OUT_FILE)
 	@dot -Tpng $(OUT_FILE) -o $(basename $(OUT_FILE)).png 
 
+# Para gerar um arquivo na mesma pasta (EX:make file FILE=tests/cp3/in/strings.pas)
+# Para rodar esse arquivo na LLVM faça lli <arquivo>.ll
+file:
+	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(basename $(FILE)).ll
+
+# Para imprimir no terminal (EX:make run FILE=tests/cp3/in/strings.pas)
 run:
 	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE)
 
