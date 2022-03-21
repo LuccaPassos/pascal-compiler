@@ -39,6 +39,10 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	private static int localRegsCount;
 	private static int jumpLabel;
 
+	private static String compPrototype = "declare i32 @strcmp(i8*, i8*)";
+	private static String scanPrototype = "declare i32 @__isoc99_scanf(i8*, ...)";
+	private static String printPrototype = "declare i32 @printf(i8*, ...)";
+
 	public CodeGen(StringTable stringTable, VariableTable variableTable) {
 		this.st = stringTable;
 		this.gvt = variableTable;
@@ -52,7 +56,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		globalRegsCount = 0;
 		localRegsCount = 1;
 		visit(root);
-		// dumpProgram();
 	}
 
 	// ----------------------------------------------------------------------------
@@ -65,7 +68,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			strs.format("@%d = private constant [%d x i8] c\"%s\\00\"\n", x,
 					s.length() + 1, s);
 		}
-
 	}
 
 	private void getPrintStrings() {
@@ -88,24 +90,13 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	}
 
 	// ----------------------------------------------------------------------------
-	// Emits ----------------------------------------------------------------------
-
-	// private void backpatchJump(int instrAddr, int jumpAddr) {
-	// code[instrAddr].o1 = jumpAddr;
-	// }
-
-	// private void backpatchBranch(int instrAddr, int offset) {
-	// code[instrAddr].o2 = offset;
-	// }
-
-	// ----------------------------------------------------------------------------
 	// AST Traversal --------------------------------------------------------------
 
 	private int newGlobalReg() {
 		return globalRegsCount++;
 	}
 
-	// É necessário mudar para múltiplas funções
+	// É necessário mudar para múltiplas funções, com múltiplos escopos
 	private int newLocalReg() {
 		return localRegsCount++;
 	}
@@ -122,7 +113,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		visit(node.getChild(0)); // var_list
 		visit(node.getChild(1)); // fun_list
 		visit(node.getChild(2)); // block
-		System.out.println("  ret void \n}");
+		System.out.println("  ret void \n}\n");
 
 		getPrintStrings();
 		dumpStrings();
@@ -191,19 +182,52 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		AST r = node.getChild(1);
 		String y = visit(l);
 		String z = visit(r);
-		int x = newLocalReg();
+		int x = 0;
 
 		if (r.type == INT_TYPE) {
+			x = newLocalReg();
 			System.out.printf("  %%%d = icmp eq i32 %s, %s\n", x, y, z);
 
 		} else if (r.type == REAL_TYPE) {
+			x = newLocalReg();
 			System.out.printf("  %%%d = fcmp oeq double %s, %s\n", x, y, z);
 
 		} else if (r.type == BOOL_TYPE) {
+			x = newLocalReg();
 			System.out.printf("  %%%d = icmp eq i1 %s, %s\n", x, y, z);
 
 		} else if (r.type == STR_TYPE) {
-			System.out.println("Equal STR_TYPE\n");
+			if (!declares.contains(compPrototype))
+				declares.add(compPrototype);
+
+			// Se as strings forem puras, precisa do ponteiro delas
+			if (y.startsWith("@")) {
+				int b = newLocalReg();
+				String s = st.getString(Integer.parseInt(y.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", b, len,
+						len, y);
+
+				y = String.format("%%%d", b);
+			}
+			if (z.startsWith("@")) {
+				int c = newLocalReg();
+				String s = st.getString(Integer.parseInt(z.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", c, len,
+						len, z);
+
+				z = String.format("%%%d", c);
+			}
+
+			int a = newLocalReg();
+			x = newLocalReg();
+
+			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
+			// Se o valor for = 0, zero as string são iguais
+			System.out.printf("  %%%d = icmp eq i32 %%%d, 0\n", x, a);
 
 		} else {
 			System.err.println("Equal type not known!");
@@ -218,19 +242,52 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		AST r = node.getChild(1);
 		String y = visit(l);
 		String z = visit(r);
-		int x = newLocalReg();
+		int x = 0;
 
 		if (r.type == INT_TYPE) {
+			x = newLocalReg();
 			System.out.printf("  %%%d = icmp ne i32 %s, %s\n", x, y, z);
 
 		} else if (r.type == REAL_TYPE) {
+			x = newLocalReg();
 			System.out.printf("  %%%d = fcmp one double %s, %s\n", x, y, z);
 
 		} else if (r.type == BOOL_TYPE) {
+			x = newLocalReg();
 			System.out.printf("  %%%d = icmp ne i1 %s, %s\n", x, y, z);
 
 		} else if (r.type == STR_TYPE) {
-			System.out.println("Nequal STR_TYPE\n");
+			if (!declares.contains(compPrototype))
+				declares.add(compPrototype);
+
+			// Se as strings forem puras, precisa do ponteiro delas
+			if (y.startsWith("@")) {
+				int b = newLocalReg();
+				String s = st.getString(Integer.parseInt(y.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", b, len,
+						len, y);
+
+				y = String.format("%%%d", b);
+			}
+			if (z.startsWith("@")) {
+				int c = newLocalReg();
+				String s = st.getString(Integer.parseInt(z.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", c, len,
+						len, z);
+
+				z = String.format("%%%d", c);
+			}
+
+			int a = newLocalReg();
+			x = newLocalReg();
+
+			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
+			// Se o valor for != 0, as string são diferentes
+			System.out.printf("  %%%d = icmp ne i32 %%%d, 0\n", x, a);
 
 		} else {
 			System.err.println("Nequal type not known!");
@@ -264,10 +321,39 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			System.out.printf("  %%%d = icmp slt i32 %%%d, %%%d\n", x, convY, convZ);
 
 		} else if (r.type == STR_TYPE) {
-			System.out.println("Nequal STR_TYPE\n");
+			if (!declares.contains(compPrototype))
+				declares.add(compPrototype);
 
+			// Se as strings forem puras, precisa do ponteiro delas
+			if (y.startsWith("@")) {
+				int b = newLocalReg();
+				String s = st.getString(Integer.parseInt(y.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", b, len,
+						len, y);
+
+				y = String.format("%%%d", b);
+			}
+			if (z.startsWith("@")) {
+				int c = newLocalReg();
+				String s = st.getString(Integer.parseInt(z.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", c, len,
+						len, z);
+
+				z = String.format("%%%d", c);
+			}
+
+			int a = newLocalReg();
+			x = newLocalReg();
+
+			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
+			// Se o valor for < 0 as string y é antes de z
+			System.out.printf("  %%%d = icmp slt i32 %%%d, 0\n", x, a);
 		} else {
-			System.err.println("Nequal type not known!");
+			System.err.println("Lt type not known!");
 		}
 
 		return String.format("%%%d", x);
@@ -298,7 +384,37 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			System.out.printf("  %%%d = icmp sgt i32 %%%d, %%%d\n", x, convY, convZ);
 
 		} else if (r.type == STR_TYPE) {
-			System.out.println("Nequal STR_TYPE\n");
+			if (!declares.contains(compPrototype))
+				declares.add(compPrototype);
+
+			// Se as strings forem puras, precisa do ponteiro delas
+			if (y.startsWith("@")) {
+				int b = newLocalReg();
+				String s = st.getString(Integer.parseInt(y.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", b, len,
+						len, y);
+
+				y = String.format("%%%d", b);
+			}
+			if (z.startsWith("@")) {
+				int c = newLocalReg();
+				String s = st.getString(Integer.parseInt(z.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", c, len,
+						len, z);
+
+				z = String.format("%%%d", c);
+			}
+
+			int a = newLocalReg();
+			x = newLocalReg();
+
+			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
+			// Se o valor for > 0 as string y é depois de z
+			System.out.printf("  %%%d = icmp sgt i32 %%%d, 0\n", x, a);
 
 		} else {
 			System.err.println("Nequal type not known!");
@@ -332,7 +448,37 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			System.out.printf("  %%%d = icmp sge i32 %%%d, %%%d\n", x, convY, convZ);
 
 		} else if (r.type == STR_TYPE) {
-			System.out.println("Nequal STR_TYPE\n");
+			if (!declares.contains(compPrototype))
+				declares.add(compPrototype);
+
+			// Se as strings forem puras, precisa do ponteiro delas
+			if (y.startsWith("@")) {
+				int b = newLocalReg();
+				String s = st.getString(Integer.parseInt(y.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", b, len,
+						len, y);
+
+				y = String.format("%%%d", b);
+			}
+			if (z.startsWith("@")) {
+				int c = newLocalReg();
+				String s = st.getString(Integer.parseInt(z.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", c, len,
+						len, z);
+
+				z = String.format("%%%d", c);
+			}
+
+			int a = newLocalReg();
+			x = newLocalReg();
+
+			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
+			// Se o valor for > 0 as string y é depois de z
+			System.out.printf("  %%%d = icmp sge i32 %%%d, 0\n", x, a);
 
 		} else {
 			System.err.println("Nequal type not known!");
@@ -366,7 +512,36 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			System.out.printf("  %%%d = icmp sle i32 %%%d, %%%d\n", x, convY, convZ);
 
 		} else if (r.type == STR_TYPE) {
-			System.out.println("Nequal STR_TYPE\n");
+			if (!declares.contains(compPrototype))
+				declares.add(compPrototype);
+
+			// Se as strings forem puras, precisa do ponteiro delas
+			if (y.startsWith("@")) {
+				int b = newLocalReg();
+				String s = st.getString(Integer.parseInt(y.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", b, len,
+						len, y);
+
+				y = String.format("%%%d", b);
+			}
+			if (z.startsWith("@")) {
+				int c = newLocalReg();
+				String s = st.getString(Integer.parseInt(z.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", c, len,
+						len, z);
+
+				z = String.format("%%%d", c);
+			}
+
+			int a = newLocalReg();
+			x = newLocalReg();
+
+			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
+			System.out.printf("  %%%d = icmp sle i32 %%%d, 0\n", x, a);
 
 		} else {
 			System.err.println("Nequal type not known!");
@@ -403,49 +578,32 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return String.format("%%%d", x);
 	}
 
-	// @Override
-	// protected String visitIf(AST node) {
-	// // O child 0 é o teste
-	// // O child 1 é o if
-	// // O child 2 é o else
+	@Override
+	protected String visitIf(AST node) {
+		String testReg = visit(node.getChild(0));
+		boolean hasElse = node.getChildrenSize() == 3;
+		int ifTrue = newJumpLabel();
+		int ifFalse = 0;
+		if (hasElse)
+			ifFalse = newJumpLabel();
 
-	// String testReg = visit(node.getChild(0));
-	// int ifTrue = newJumpLabel();
-	// StringBuilder sb = new StringBuilder();
-	// Formatter f = new Formatter(sb);
-	// f.format(" br i1 %s, label %%jmp%d, label ", testReg, ifTrue);
-	// // System.out.printf(" br i1 %s, label %%%d, label %7\n")
-	// // System.out.printf(" br i1 %s, label %%%d, label %7\n", testReg, ifTrue);
+		int cont = newJumpLabel();
 
-	// System.out.printf("\n%d:\n", ifTrue);
-	// // int condJumpInstr = nextInstr;
-	// // emit(BOFb, testReg, 0); // Leave offset empty now, will be backpatched.
+		System.out.printf("  br i1 %s, label %%jmp%d, label %%jmp%d\n", testReg, ifTrue, hasElse ? ifFalse : cont);
 
-	// // // Code for TRUE block.
-	// // int trueBranchStart = nextInstr;
-	// visit(node.getChild(1)); // Generate TRUE block.
-	// int ifFalse = newLocalReg();
-	// f.format("%%%d", ifFalse);
-	// System.out.println(f.toString());
-	// // // Code for FALSE block.
-	// // int falseBranchStart;
-	// // if (node.getChildCount() == 3) { // We have an else.
-	// // // Emit unconditional jump for TRUE block.
-	// // int uncondJumpInstr = nextInstr;
-	// // emit(JUMP, 0); // Leave address empty now, will be backpatched.
-	// // falseBranchStart = nextInstr;
-	// // visit(node.getChild(2)); // Generate FALSE block.
-	// // // Backpatch unconditional jump at end of TRUE block.
-	// // backpatchJump(uncondJumpInstr, nextInstr);
-	// // } else {
-	// // falseBranchStart = nextInstr;
-	// // }
+		System.out.printf("\njmp%d:\n", ifTrue);
+		visit(node.getChild(1));
+		System.out.printf("  br label %%jmp%d\n", cont);
 
-	// // // Backpatch test.
-	// // backpatchBranch(condJumpInstr, falseBranchStart - trueBranchStart + 1);
+		System.out.printf("\njmp%d:\n", hasElse ? ifFalse : cont);
+		if (hasElse) {
+			visit(node.getChild(2));
+			System.out.printf("  br label %%jmp%d\n", cont);
+			System.out.printf("\njmp%d:\n", cont);
+		}
 
-	// return "";
-	// }
+		return "";
+	}
 
 	@Override
 	protected String visitIntVal(AST node) {
@@ -586,10 +744,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	// Ignorar parametros no read (ex read(a,b) por enquanto
 	@Override
 	protected String visitRead(AST node) {
-		String printPrototype = "declare i32 @__isoc99_scanf(i8*, ...)";
-
-		if (!declares.contains(printPrototype))
-			declares.add(printPrototype);
+		if (!declares.contains(scanPrototype))
+			declares.add(scanPrototype);
 
 		AST var = node.getChild(0);
 		int addr = var.intData;
@@ -715,8 +871,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	// Ignorar parametros no write (ex write(1,2, 'Hey')) por enquanto
 	@Override
 	protected String visitWrite(AST node) {
-		String printPrototype = "declare i32 @printf(i8*, ...)";
-
 		if (!declares.contains(printPrototype))
 			declares.add(printPrototype);
 

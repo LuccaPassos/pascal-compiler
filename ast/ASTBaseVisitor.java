@@ -23,8 +23,8 @@ public abstract class ASTBaseVisitor<T> {
 				return visitBlock(node);
 			case BOOL_VAL_NODE:
 				return visitBoolVal(node);
-			// case IF_NODE:
-			// return visitIf(node);
+			case IF_NODE:
+				return visitIf(node);
 			case INT_VAL_NODE:
 				return visitIntVal(node);
 			case LT_NODE:
@@ -110,7 +110,7 @@ public abstract class ASTBaseVisitor<T> {
 
 	protected abstract T visitBoolVal(AST node);
 
-	// protected abstract T visitIf(AST node);
+	protected abstract T visitIf(AST node);
 
 	protected abstract T visitIntVal(AST node);
 
