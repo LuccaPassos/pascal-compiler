@@ -756,63 +756,66 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return String.format("%%%d", x);
 	}
 
-	// Ignorar parametros no read (ex read(a,b) por enquanto
 	@Override
 	protected String visitRead(AST node) {
 		if (!declares.contains(scanPrototype))
 			declares.add(scanPrototype);
 
-		AST var = node.getChild(0);
-		int addr = var.intData;
-		int x = 0;
+		for (int k = 0; k < node.getChildrenSize(); k++) {
+			AST var = node.getChild(k);
+			int addr = var.intData;
+			int x = 0;
 
-		if (var.type == INT_TYPE) {
-			if (!printStrs.containsKey(Print.INT)) {
-				int i = newGlobalReg();
-				Print p = Print.INT.setIndex(i);
-				printStrs.put(Print.INT, p);
+			if (var.type == INT_TYPE) {
+				if (!printStrs.containsKey(Print.INT)) {
+					int i = newGlobalReg();
+					Print p = Print.INT.setIndex(i);
+					printStrs.put(Print.INT, p);
+				}
+				int a = printStrs.get(Print.INT).index;
+				int pointer = newLocalReg();
+				x = newLocalReg();
+
+				System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
+						a);
+				System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, i32* %%%d)\n", x, pointer,
+						addr + 1);
+
+			} else if (var.type == REAL_TYPE) {
+				if (!printStrs.containsKey(Print.REAL)) {
+					int i = newGlobalReg();
+					Print p = Print.REAL.setIndex(i);
+					printStrs.put(Print.REAL, p);
+				}
+				int a = printStrs.get(Print.REAL).index;
+				int pointer = newLocalReg();
+				x = newLocalReg();
+
+				System.out.printf("  %%%d = getelementptr inbounds [4 x i8], [4 x i8]* @%d, i64 0, i64 0\n", pointer,
+						a);
+				System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, double* %%%d)\n", x, pointer,
+						addr + 1);
+
+			} else if (var.type == CHAR_TYPE) {
+				if (!printStrs.containsKey(Print.CHAR)) {
+					int i = newGlobalReg();
+					Print p = Print.CHAR.setIndex(i);
+					printStrs.put(Print.CHAR, p);
+				}
+				int a = printStrs.get(Print.CHAR).index;
+				int pointer = newLocalReg();
+				x = newLocalReg();
+
+				System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
+						a);
+				System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, i8* %%%d)\n", x, pointer,
+						addr + 1);
+			} else if (var.type == STR_TYPE) {
+				// Segfault
+			} else {
+				System.err.printf("This type is impossible to read: %s\n", var.type);
 			}
-			int a = printStrs.get(Print.INT).index;
-			int pointer = newLocalReg();
-			x = newLocalReg();
-
-			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer, a);
-			System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, i32* %%%d)\n", x, pointer,
-					addr + 1);
-
-		} else if (var.type == REAL_TYPE) {
-			if (!printStrs.containsKey(Print.REAL)) {
-				int i = newGlobalReg();
-				Print p = Print.REAL.setIndex(i);
-				printStrs.put(Print.REAL, p);
-			}
-			int a = printStrs.get(Print.REAL).index;
-			int pointer = newLocalReg();
-			x = newLocalReg();
-
-			System.out.printf("  %%%d = getelementptr inbounds [4 x i8], [4 x i8]* @%d, i64 0, i64 0\n", pointer, a);
-			System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, double* %%%d)\n", x, pointer,
-					addr + 1);
-
-		} else if (var.type == CHAR_TYPE) {
-			if (!printStrs.containsKey(Print.CHAR)) {
-				int i = newGlobalReg();
-				Print p = Print.CHAR.setIndex(i);
-				printStrs.put(Print.CHAR, p);
-			}
-			int a = printStrs.get(Print.CHAR).index;
-			int pointer = newLocalReg();
-			x = newLocalReg();
-
-			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer, a);
-			System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, i8* %%%d)\n", x, pointer,
-					addr + 1);
-		} else if (var.type == STR_TYPE) {
-			// Segfault
-		} else {
-			System.err.printf("This type is impossible to read: %s\n", var.type);
 		}
-
 		return "";
 	}
 
@@ -893,112 +896,113 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return String.format("%%%d", x);
 	}
 
-	// Ignorar parametros no write (ex write(1,2, 'Hey')) por enquanto
 	@Override
 	protected String visitWrite(AST node) {
 		if (!declares.contains(printPrototype))
 			declares.add(printPrototype);
 
-		AST expr = node.getChild(0);
-		String x = visit(expr);
+		for (int k = 0; k < node.getChildrenSize(); k++) {
+			AST expr = node.getChild(k);
+			String x = visit(expr);
 
-		if (expr.type == STR_TYPE) {
-			int pointer = newLocalReg();
-			int result = newLocalReg();
+			if (expr.type == STR_TYPE) {
+				int pointer = newLocalReg();
+				int result = newLocalReg();
 
-			// O parâmetro string do write pode vir de uma string pura (@)
-			// ou de um registrador (%).
-			// Sendo de um registrador não tem como saber o tamanho dela
-			if (x.startsWith("@")) {
-				// Pega a string salva para obter o tamanho dela
-				String s = st.getString(Integer.parseInt(x.substring(1)));
-				int len = s.length() + 1;
+				// O parâmetro string do write pode vir de uma string pura (@)
+				// ou de um registrador (%).
+				// Sendo de um registrador não tem como saber o tamanho dela
+				if (x.startsWith("@")) {
+					// Pega a string salva para obter o tamanho dela
+					String s = st.getString(Integer.parseInt(x.substring(1)));
+					int len = s.length() + 1;
 
-				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n",
-						pointer,
-						len, len, x);
-				System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d)\n", result,
-						pointer);
-			} else {
-				if (!printStrs.containsKey(Print.STR)) {
-					int i = newGlobalReg();
-					Print p = Print.STR.setIndex(i);
-					printStrs.put(Print.STR, p);
+					System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n",
+							pointer,
+							len, len, x);
+					System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d)\n", result,
+							pointer);
+				} else {
+					if (!printStrs.containsKey(Print.STR)) {
+						int i = newGlobalReg();
+						Print p = Print.STR.setIndex(i);
+						printStrs.put(Print.STR, p);
+					}
+					int a = printStrs.get(Print.STR).index;
+
+					System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n",
+							pointer,
+							a);
+					System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i8* %s)\n", result, pointer, x);
 				}
-				int a = printStrs.get(Print.STR).index;
 
-				System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n",
-						pointer,
+			} else if (expr.type == REAL_TYPE) {
+				int pointer = newLocalReg();
+				int result = newLocalReg();
+
+				// Caso ainda não haja uma string de impressão de reais,
+				// ("%f"), adiciona ela
+				if (!printStrs.containsKey(Print.REAL)) {
+					int i = newGlobalReg();
+					Print p = Print.REAL.setIndex(i);
+					printStrs.put(Print.REAL, p);
+				}
+				int a = printStrs.get(Print.REAL).index;
+
+				System.out.printf("  %%%d = getelementptr inbounds [4 x i8], [4 x i8]* @%d, i64 0, i64 0\n", pointer,
 						a);
-				System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i8* %s)\n", result, pointer, x);
+				System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, double %s)\n", result, pointer, x);
+
+			} else if (expr.type == INT_TYPE) {
+				int pointer = newLocalReg();
+				int result = newLocalReg();
+
+				if (!printStrs.containsKey(Print.INT)) {
+					int i = newGlobalReg();
+					Print p = Print.INT.setIndex(i);
+					printStrs.put(Print.INT, p);
+				}
+				int a = printStrs.get(Print.INT).index;
+
+				System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
+						a);
+				System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i32 %s)\n", result, pointer, x);
+
+			} else if (expr.type == BOOL_TYPE) {
+				int pointer = newLocalReg();
+				int result = newLocalReg();
+
+				// Vamos imprimir como um inteiro, já que o printf não tem bool
+				if (!printStrs.containsKey(Print.INT)) {
+					int i = newGlobalReg();
+					Print p = Print.INT.setIndex(i);
+					printStrs.put(Print.INT, p);
+				}
+				int a = printStrs.get(Print.INT).index;
+
+				System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
+						a);
+				System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i1 %s)\n", result, pointer, x);
+
+			} else if (expr.type == CHAR_TYPE) {
+				int pointer = newLocalReg();
+				int result = newLocalReg();
+
+				if (!printStrs.containsKey(Print.CHAR)) {
+					int i = newGlobalReg();
+					Print p = Print.CHAR.setIndex(i);
+					printStrs.put(Print.CHAR, p);
+				}
+				int a = printStrs.get(Print.CHAR).index;
+
+				System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
+						a);
+				System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i8 %s)\n", result, pointer, x);
+
+			} else {
+				System.err.printf("Invalid type: %s!\n", expr.type.toString());
+				System.exit(1);
 			}
-
-		} else if (expr.type == REAL_TYPE) {
-			int pointer = newLocalReg();
-			int result = newLocalReg();
-
-			// Caso ainda não haja uma string de impressão de reais,
-			// ("%f"), adiciona ela
-			if (!printStrs.containsKey(Print.REAL)) {
-				int i = newGlobalReg();
-				Print p = Print.REAL.setIndex(i);
-				printStrs.put(Print.REAL, p);
-			}
-			int a = printStrs.get(Print.REAL).index;
-
-			System.out.printf("  %%%d = getelementptr inbounds [4 x i8], [4 x i8]* @%d, i64 0, i64 0\n", pointer,
-					a);
-			System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, double %s)\n", result, pointer, x);
-
-		} else if (expr.type == INT_TYPE) {
-			int pointer = newLocalReg();
-			int result = newLocalReg();
-
-			if (!printStrs.containsKey(Print.INT)) {
-				int i = newGlobalReg();
-				Print p = Print.INT.setIndex(i);
-				printStrs.put(Print.INT, p);
-			}
-			int a = printStrs.get(Print.INT).index;
-
-			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
-					a);
-			System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i32 %s)\n", result, pointer, x);
-
-		} else if (expr.type == BOOL_TYPE) {
-			int pointer = newLocalReg();
-			int result = newLocalReg();
-
-			// Vamos imprimir como um inteiro, já que o printf não tem bool
-			if (!printStrs.containsKey(Print.INT)) {
-				int i = newGlobalReg();
-				Print p = Print.INT.setIndex(i);
-				printStrs.put(Print.INT, p);
-			}
-			int a = printStrs.get(Print.INT).index;
-
-			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
-					a);
-			System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i1 %s)\n", result, pointer, x);
-
-		} else if (expr.type == CHAR_TYPE) {
-			int pointer = newLocalReg();
-			int result = newLocalReg();
-
-			if (!printStrs.containsKey(Print.CHAR)) {
-				int i = newGlobalReg();
-				Print p = Print.CHAR.setIndex(i);
-				printStrs.put(Print.CHAR, p);
-			}
-			int a = printStrs.get(Print.CHAR).index;
-
-			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
-					a);
-			System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i8 %s)\n", result, pointer, x);
-
-		} else {
-			System.err.printf("Invalid type: %s!\n", expr.type.toString());
-			System.exit(1);
 		}
 
 		return "";

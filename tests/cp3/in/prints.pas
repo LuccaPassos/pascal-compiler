@@ -12,17 +12,9 @@ begin
     b := 15.66;
 	c := false;
 	d := 'Hi!';
-	e := chr(57);
-	write(a);
-	write(b);
-	write(c);
-	write(d);
-	write(e);
-
-	write(12);
-	write(15.66);
-	write(false);
-	write('Hi!');
-	write(chr(67));	
+	e := chr(65);
+	write(a, b, c, d, e);
+	write(chr(10));
+	write(12, 15.66, false, 'Hi!', chr(65));
 	
 end.

@@ -5,10 +5,8 @@ var
     b : real;
 
 begin
-	read(a);
-	write(a);
+	read(a, b);
 	write(chr(10));
-	read(b);
-	write(b);
+	write(b,'  ',a);
 
 end.
