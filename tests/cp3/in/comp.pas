@@ -1,22 +1,18 @@
-program equal;
+program comps;
 
 var 
-    a : integer;
-    b : integer;
-    
-	c : real;
-	d : real;
-
-	e : boolean;
-	f : boolean;
+    a, b : integer;
+	c, d : real;
+	e, f : boolean;
+	g, h : string;
 
 begin
     a := 20;
     b := 10;
 	write(a);
-	write('|');
+	write('       |');
 	write(b);
-	write('||');
+	write('        || ');
 	write(a = b);
 	write('|');
 	write(a <> b);
@@ -35,7 +31,7 @@ begin
 	write(c);
 	write('|');
 	write(d);
-	write('||');
+	write(' || ');
 	write(c = d);
 	write('|');
 	write(c <> d);
@@ -52,9 +48,9 @@ begin
     e := true;
     f := false;
 	write(e);
-	write('|');
+	write('        |');
 	write(f);
-	write('||');
+	write('         || ');
 	write(e = f);
 	write('|');
 	write(e <> f);
@@ -66,5 +62,24 @@ begin
 	write(e >= f);
 	write('|');
 	write(e <= f);
+	write(chr(10));
+
+    g := 'abcd';
+    h := 'efgh';
+	write(g);
+	write('     |');
+	write(h);
+	write('      || ');
+	write(g = h);
+	write('|');
+	write(g <> h);
+	write('|');
+	write(g > h);
+	write('|');
+	write(g < h);
+	write('|');
+	write(g >= h);
+	write('|');
+	write(g <= h);
 	write(chr(10));
 end.

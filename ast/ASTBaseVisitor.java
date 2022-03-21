@@ -61,8 +61,8 @@ public abstract class ASTBaseVisitor<T> {
 				return visitRead(node);
 			case REAL_VAL_NODE:
 				return visitRealVal(node);
-			// case REPEAT_NODE:
-			// return visitRepeat(node);
+			case REPEAT_NODE:
+				return visitRepeat(node);
 			case STR_VAL_NODE:
 				return visitStrVal(node);
 			case TIMES_NODE:
@@ -76,8 +76,8 @@ public abstract class ASTBaseVisitor<T> {
 			case WRITE_NODE:
 				return visitWrite(node);
 
-			// case C2S_NODE:
-			// return visitC2S(node);
+			case C2S_NODE:
+				return visitC2S(node);
 			// case S2C_NODE:
 			// return visitS2C(node);
 			// case B2I_NODE:
@@ -148,7 +148,7 @@ public abstract class ASTBaseVisitor<T> {
 
 	protected abstract T visitRealVal(AST node);
 
-	// protected abstract T visitRepeat(AST node);
+	protected abstract T visitRepeat(AST node);
 
 	protected abstract T visitStrVal(AST node);
 
@@ -174,7 +174,7 @@ public abstract class ASTBaseVisitor<T> {
 
 	// protected abstract T visitR2S(AST node);
 
-	// protected abstract T visitC2S(AST node);
+	protected abstract T visitC2S(AST node);
 
 	// protected abstract T visitS2C(AST node);
 

@@ -17,8 +17,6 @@ import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.HashMap;
 
-import org.antlr.v4.parse.ANTLRParser.sync_return;
-
 // Declarar o tipo como string permite que nós retornem valores diversos, 
 // a serem tratados dentro dos pais
 // Os valores de ponto flutuante foram tratados como double devido a 
@@ -42,6 +40,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	private static String compPrototype = "declare i32 @strcmp(i8*, i8*)";
 	private static String scanPrototype = "declare i32 @__isoc99_scanf(i8*, ...)";
 	private static String printPrototype = "declare i32 @printf(i8*, ...)";
+	// private static String strPrototype = "declare i8* @strcpy(i8*, i8*)\ndeclare
+	// i8* @strcat(i8*, i8*)";
 
 	public CodeGen(StringTable stringTable, VariableTable variableTable) {
 		this.st = stringTable;
@@ -589,17 +589,20 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 
 		int cont = newJumpLabel();
 
-		System.out.printf("  br i1 %s, label %%jmp%d, label %%jmp%d\n", testReg, ifTrue, hasElse ? ifFalse : cont);
+		String l1 = String.format("if.false.%d", ifFalse);
+		String l2 = String.format("if.cont.%d", cont);
 
-		System.out.printf("\njmp%d:\n", ifTrue);
+		System.out.printf("  br i1 %s, label %%if.true.%d, label %%%s\n", testReg, ifTrue, hasElse ? l1 : l2);
+
+		System.out.printf("\nif.true.%d:\n", ifTrue);
 		visit(node.getChild(1));
-		System.out.printf("  br label %%jmp%d\n", cont);
+		System.out.printf("  br label %%if.cont.%d\n", cont);
 
-		System.out.printf("\njmp%d:\n", hasElse ? ifFalse : cont);
+		System.out.printf("\n%s:\n", hasElse ? l1 : l2);
 		if (hasElse) {
 			visit(node.getChild(2));
-			System.out.printf("  br label %%jmp%d\n", cont);
-			System.out.printf("\njmp%d:\n", cont);
+			System.out.printf("  br label %%if.cont.%d\n", cont);
+			System.out.printf("\nif.cont.%d:\n", cont);
 		}
 
 		return "";
@@ -705,16 +708,28 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	protected String visitPlus(AST node) {
 		String y = visit(node.getChild(0));
 		String z = visit(node.getChild(1));
-		int x = newLocalReg();
+		int x = 0;
 
 		if (node.type == INT_TYPE) {
+			x = newLocalReg();
 			System.out.printf("  %%%d = add i32 %s, %s\n", x, y, z);
 		} else if (node.type == REAL_TYPE) {
+			x = newLocalReg();
 			System.out.printf("  %%%d = fadd double %s, %s\n", x, y, z);
 		} else if (node.type == STR_TYPE) {
-			// Concat
-		} else if (node.type == CHAR_TYPE) {
-			// Não sei se isso existe...
+			// if (!declares.contains(strPrototype))
+			// declares.add(strPrototype);
+
+			// int a = newLocalReg();
+			// int b = newLocalReg();
+			// int c = newLocalReg();
+			// x = newLocalReg();
+			// System.out.printf(" %%%d = alloca [100 x i8]\n", a);
+			// System.out.printf(" %%%d = getelementptr inbounds [100 x i8], [100 x i8]*
+			// %%%d, i64 0, i64 0\n", b, a);
+
+			// System.out.printf(" %%%d = call i8* @strcpy(i8* %%%d, i8* %s)\n", c, b, y);
+			// System.out.printf(" %%%d = call i8* @strcat(i8* %%%d, i8* %s)\n", x, b, z);
 		} else {
 			System.err.println("This type is impossible to add");
 		}
@@ -801,14 +816,24 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return "";
 	}
 
-	// @Override
-	// protected Integer visitRepeat(AST node) {
-	// int beginRepeat = nextInstr;
-	// visit(node.getChild(0)); // Emit code for body.
-	// int testReg = visit(node.getChild(1)); // Emit code for test.
-	// emit(BOFb, testReg, beginRepeat - nextInstr);
-	// return -1; // This is not an expression, hence no value to return.
-	// }
+	@Override
+	protected String visitRepeat(AST node) {
+		int test = newJumpLabel();
+		int repeat = newJumpLabel();
+		int cont = newJumpLabel();
+		System.out.printf("  br label %%while.test.%d\n", test);
+
+		System.out.printf("\nwhile.test.%d:\n", test);
+		String testReg = visit(node.getChild(0));
+		System.out.printf("  br i1 %s, label %%while.repeat.%d, label %%while.cont.%d\n", testReg, repeat, cont);
+
+		System.out.printf("\nwhile.repeat.%d:\n", repeat);
+		visit(node.getChild(1));
+		System.out.printf("  br label %%while.test.%d\n", test);
+
+		System.out.printf("\nwhile.cont.%d:\n", cont);
+		return "";
+	}
 
 	@Override
 	protected String visitVarDecl(AST node) {
@@ -979,9 +1004,17 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return "";
 	}
 
-	// @Override //TODO
-	// protected Integer visitC2S(AST node) {
-	// }
+	@Override // TODO
+	protected String visitC2S(AST node) {
+		String i = visit(node.getChild(0));
+		int a = newLocalReg();
+		int b = newLocalReg();
+		System.out.printf("  %%%d = alloca [2 x i8]\n", a);
+		System.out.printf("  %%%d = getelementptr inbounds [2 x i8], [2 x i8]* %%%d, i64 0, i64 0\n", b, a);
+		System.out.printf("  store i8 %s, i8* %%%d\n", i, b);
+
+		return String.format("%%%d", b);
+	}
 
 	// @Override //TODO
 	// protected Integer visitS2C(AST node) {
@@ -1035,5 +1068,4 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	// emit(R2Ss, x, y);
 	// return x;
 	// }
-
 }
