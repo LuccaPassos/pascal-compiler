@@ -43,10 +43,10 @@ public class Main {
 		checker.visit(tree);
 
 		System.err.println("PARSE SUCCESSFUL!");
-		checker.printTables();
+		// checker.printTables();
 		// checker.printAST();
 
-		System.err.println("Generating Code...");
+		System.err.println("Generating Code...\n\n");
 
 		CodeGen codeGen = new CodeGen(checker.stringTable,
 				checker.globalScope.getVaraibleTable());

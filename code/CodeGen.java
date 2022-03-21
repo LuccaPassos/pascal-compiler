@@ -7,79 +7,88 @@ import tables.StringTable;
 import tables.FunctionTable;
 import typing.Type;
 import static typing.Type.INT_TYPE;
+import static typing.Type.REAL_TYPE;
+import static typing.Type.STR_TYPE;
+import static typing.Type.BOOL_TYPE;
+import static typing.Type.CHAR_TYPE;
+import static typing.Type.ARRAY_TYPE;
 
 import java.util.ArrayList;
+import java.util.Formatter;
+import java.util.HashMap;
 
-public final class CodeGen extends ASTBaseVisitor<Integer> {
+import org.antlr.v4.parse.ANTLRParser.sync_return;
+
+// Declarar o tipo como string permite que nós retornem valores diversos, 
+// a serem tratados dentro dos pais
+// Os valores de ponto flutuante foram tratados como double devido a 
+// peculiaridades da LLVM (ex não aceitar o literal float 1.3)
+public final class CodeGen extends ASTBaseVisitor<String> {
 
 	// private final Instruction code[]; // Code memory
 	private final StringTable st;
 	private final VariableTable gvt; // global
 
-	// Próxima posição na memória de código para emit.
-	private static int nextInstr;
-
 	private static ArrayList<String> declares;
+	private static HashMap<Print, Print> printStrs;
+
+	private static StringBuilder sb;
+	private static Formatter strs;
 
 	private static int globalRegsCount;
 	private static int localRegsCount;
+	private static int jumpLabel;
 
 	public CodeGen(StringTable stringTable, VariableTable variableTable) {
-		// this.code = new Instruction[];
 		this.st = stringTable;
 		this.gvt = variableTable;
 		declares = new ArrayList<String>();
+		printStrs = new HashMap<Print, Print>();
+		sb = new StringBuilder();
+		strs = new Formatter(sb);
 	}
 
 	public void execute(AST root) {
-		nextInstr = 0;
 		globalRegsCount = 0;
 		localRegsCount = 1;
-		dumpStringTable();
 		visit(root);
-		// emit(HALT);
 		// dumpProgram();
 	}
 
 	// ----------------------------------------------------------------------------
 	// Prints ---------------------------------------------------------------------
 
-	// void dumpProgram() {
-	// for (int addr = 0; addr < nextInstr; addr++) {
-	// System.out.printf("%s\n", code[addr].toString());
-	// }
-	// }
-
-	private void dumpStringTable() {
+	private void getStringTable() {
 		for (int i = 0; i < st.size(); i++) {
 			String s = st.getString(i);
 			int x = newGlobalReg();
-			System.out.printf("@%d = private constant [%d x i8] c\"%s\\00\"\n", x,
+			strs.format("@%d = private constant [%d x i8] c\"%s\\00\"\n", x,
 					s.length() + 1, s);
+		}
+
+	}
+
+	private void getPrintStrings() {
+		ArrayList<Print> a = new ArrayList<Print>(printStrs.values());
+		PrintComparator pc = new PrintComparator();
+		a.sort(pc);
+		for (Print ele : a) {
+			strs.format("%s", ele);
+		}
+	}
+
+	private void dumpStrings() {
+		System.out.println(sb.toString());
+	}
+
+	private void dumpFuncDeclare() {
+		for (String declare : declares) {
+			System.out.println(declare);
 		}
 	}
 
 	// ----------------------------------------------------------------------------
 	// Emits ----------------------------------------------------------------------
-
-	// private void emit(OpCode op, int o1, int o2, int o3) {
-	// Instruction instr = new Instruction(op, o1, o2, o3);
-	// // Em um código para o produção deveria haver uma verificação aqui...
-	// code[nextInstr] = instr;
-	// nextInstr++;
-	// }
-
-	// private void emit(OpCode op) {
-	// emit(op, 0, 0, 0);
-	// }
-
-	// private void emit(OpCode op, int o1) {
-	// emit(op, o1, 0, 0);
-	// }
-
-	// private void emit(OpCode op, int o1, int o2) {
-	// emit(op, o1, o2, 0);
-	// }
 
 	// private void backpatchJump(int instrAddr, int jumpAddr) {
 	// code[instrAddr].o1 = jumpAddr;
@@ -101,143 +110,387 @@ public final class CodeGen extends ASTBaseVisitor<Integer> {
 		return localRegsCount++;
 	}
 
-	// Funcionamento dos visitadores abaixo deve ser razoavelmente explicativo
-	// neste final do curso...
-
-	@Override
-	protected Integer visitAssign(AST node) {
-		AST r = node.getChild(1);
-		int x = visit(r);
-		// int addr = node.getChild(0).intData;
-		// Type varType = gvt.getType(addr);
-		// if (varType == INT_TYPE) {
-		// System.out.printf(" %%%d = alloca i32\n", addr);
-		// }
-		return -1;
+	private int newJumpLabel() {
+		return jumpLabel++;
 	}
 
-	// @Override
-	// protected Integer visitEq(AST node) {
-	// AST l = node.getChild(0);
-	// AST r = node.getChild(1);
-	// int y = visit(l);
-	// int z = visit(r);
-	// int x = newIntReg();
-	// if (r.type == REAL_TYPE) { // Could equally test 'l' here.
-	// emit(EQUf, x, y, z);
-	// } else if (r.type == INT_TYPE) {
-	// emit(EQUi, x, y, z);
-	// } else { // Must be STR_TYPE
-	// emit(EQUs, x, y, z);
-	// }
-	// return x;
-	// }
+	@Override
+	protected String visitProgram(AST node) {
+		getStringTable();
 
-	// @Override //TODO
-	// protected Integer visitNeq(AST node) {
-	// }
+		System.out.println("\ndefine void @main() {");
+		visit(node.getChild(0)); // var_list
+		visit(node.getChild(1)); // fun_list
+		visit(node.getChild(2)); // block
+		System.out.println("  ret void \n}");
+
+		getPrintStrings();
+		dumpStrings();
+
+		dumpFuncDeclare();
+
+		return "";
+	}
 
 	@Override
-	protected Integer visitBlock(AST node) {
+	protected String visitBlock(AST node) {
 		for (int i = 0; i < node.getChildrenSize(); i++) {
 			visit(node.getChild(i));
 		}
-		return -1; // This is not an expression, hence no value to return.
+		return ""; // This is not an expression, hence no value to return.
+	}
+
+	@Override
+	protected String visitAssign(AST node) {
+		int addr = node.getChild(0).intData;
+		AST r = node.getChild(1);
+		String x = visit(r);
+		Type varType = gvt.getType(addr);
+
+		if (varType == INT_TYPE) {
+			System.out.printf("  store i32 %s, i32* %%%d\n", x, addr + 1);
+
+		} else if (varType == REAL_TYPE) {
+			System.out.printf("  store double %s, double* %%%d\n", x, addr + 1);
+
+		} else if (varType == BOOL_TYPE) {
+			System.out.printf("  store i1 %s, i1* %%%d\n", x, addr + 1);
+
+		} else if (varType == CHAR_TYPE) {
+			System.out.printf("  store i8 %s, i8* %%%d\n", x, addr + 1);
+
+		} else if (varType == STR_TYPE) {
+			// A string pode ser pura (@str) ou de um registrador (%num)
+			if (x.startsWith("@")) {
+				int pointer = newLocalReg();
+				String s = st.getString(Integer.parseInt(x.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n", pointer,
+						len, len, x);
+
+				System.out.printf(
+						"  store i8* %%%d, i8** %%%d\n", pointer, addr + 1);
+			} else {
+				System.out.printf("  store i8* %s, i8** %%%d\n", x, addr + 1);
+
+			}
+
+		} else if (varType == ARRAY_TYPE) {
+			System.out.printf("Assign ARRAY_TYPE\n");
+
+		} else {
+			System.err.println("Assign type not known!");
+		}
+		return "";
+	}
+
+	@Override
+	protected String visitEq(AST node) {
+		AST l = node.getChild(0);
+		AST r = node.getChild(1);
+		String y = visit(l);
+		String z = visit(r);
+		int x = newLocalReg();
+
+		if (r.type == INT_TYPE) {
+			System.out.printf("  %%%d = icmp eq i32 %s, %s\n", x, y, z);
+
+		} else if (r.type == REAL_TYPE) {
+			System.out.printf("  %%%d = fcmp oeq double %s, %s\n", x, y, z);
+
+		} else if (r.type == BOOL_TYPE) {
+			System.out.printf("  %%%d = icmp eq i1 %s, %s\n", x, y, z);
+
+		} else if (r.type == STR_TYPE) {
+			System.out.println("Equal STR_TYPE\n");
+
+		} else {
+			System.err.println("Equal type not known!");
+		}
+
+		return String.format("%%%d", x);
+	}
+
+	@Override
+	protected String visitNeq(AST node) {
+		AST l = node.getChild(0);
+		AST r = node.getChild(1);
+		String y = visit(l);
+		String z = visit(r);
+		int x = newLocalReg();
+
+		if (r.type == INT_TYPE) {
+			System.out.printf("  %%%d = icmp ne i32 %s, %s\n", x, y, z);
+
+		} else if (r.type == REAL_TYPE) {
+			System.out.printf("  %%%d = fcmp one double %s, %s\n", x, y, z);
+
+		} else if (r.type == BOOL_TYPE) {
+			System.out.printf("  %%%d = icmp ne i1 %s, %s\n", x, y, z);
+
+		} else if (r.type == STR_TYPE) {
+			System.out.println("Nequal STR_TYPE\n");
+
+		} else {
+			System.err.println("Nequal type not known!");
+		}
+
+		return String.format("%%%d", x);
+	}
+
+	@Override
+	protected String visitLt(AST node) {
+		AST l = node.getChild(0);
+		AST r = node.getChild(1);
+		String y = visit(l);
+		String z = visit(r);
+		int x = 0;
+
+		if (r.type == INT_TYPE) {
+			x = newLocalReg();
+			System.out.printf("  %%%d = icmp slt i32 %s, %s\n", x, y, z);
+
+		} else if (r.type == REAL_TYPE) {
+			x = newLocalReg();
+			System.out.printf("  %%%d = fcmp olt double %s, %s\n", x, y, z);
+
+		} else if (r.type == BOOL_TYPE) {
+			int convY = newLocalReg();
+			int convZ = newLocalReg();
+			x = newLocalReg();
+			System.out.printf("  %%%d = zext i1 %s to i32\n", convY, y);
+			System.out.printf("  %%%d = zext i1 %s to i32\n", convZ, z);
+			System.out.printf("  %%%d = icmp slt i32 %%%d, %%%d\n", x, convY, convZ);
+
+		} else if (r.type == STR_TYPE) {
+			System.out.println("Nequal STR_TYPE\n");
+
+		} else {
+			System.err.println("Nequal type not known!");
+		}
+
+		return String.format("%%%d", x);
+	}
+
+	@Override
+	protected String visitGt(AST node) {
+		AST l = node.getChild(0);
+		AST r = node.getChild(1);
+		String y = visit(l);
+		String z = visit(r);
+		int x = 0;
+
+		if (r.type == INT_TYPE) {
+			x = newLocalReg();
+			System.out.printf("  %%%d = icmp sgt i32 %s, %s\n", x, y, z);
+
+		} else if (r.type == REAL_TYPE) {
+			x = newLocalReg();
+			System.out.printf("  %%%d = fcmp ogt double %s, %s\n", x, y, z);
+
+		} else if (r.type == BOOL_TYPE) {
+			int convY = newLocalReg();
+			int convZ = newLocalReg();
+			x = newLocalReg();
+			System.out.printf("  %%%d = zext i1 %s to i32\n", convY, y);
+			System.out.printf("  %%%d = zext i1 %s to i32\n", convZ, z);
+			System.out.printf("  %%%d = icmp sgt i32 %%%d, %%%d\n", x, convY, convZ);
+
+		} else if (r.type == STR_TYPE) {
+			System.out.println("Nequal STR_TYPE\n");
+
+		} else {
+			System.err.println("Nequal type not known!");
+		}
+
+		return String.format("%%%d", x);
+	}
+
+	@Override
+	protected String visitGe(AST node) {
+		AST l = node.getChild(0);
+		AST r = node.getChild(1);
+		String y = visit(l);
+		String z = visit(r);
+		int x = 0;
+
+		if (r.type == INT_TYPE) {
+			x = newLocalReg();
+			System.out.printf("  %%%d = icmp sge i32 %s, %s\n", x, y, z);
+
+		} else if (r.type == REAL_TYPE) {
+			x = newLocalReg();
+			System.out.printf("  %%%d = fcmp oge double %s, %s\n", x, y, z);
+
+		} else if (r.type == BOOL_TYPE) {
+			int convY = newLocalReg();
+			int convZ = newLocalReg();
+			x = newLocalReg();
+			System.out.printf("  %%%d = zext i1 %s to i32\n", convY, y);
+			System.out.printf("  %%%d = zext i1 %s to i32\n", convZ, z);
+			System.out.printf("  %%%d = icmp sge i32 %%%d, %%%d\n", x, convY, convZ);
+
+		} else if (r.type == STR_TYPE) {
+			System.out.println("Nequal STR_TYPE\n");
+
+		} else {
+			System.err.println("Nequal type not known!");
+		}
+
+		return String.format("%%%d", x);
+	}
+
+	@Override
+	protected String visitLe(AST node) {
+		AST l = node.getChild(0);
+		AST r = node.getChild(1);
+		String y = visit(l);
+		String z = visit(r);
+		int x = 0;
+
+		if (r.type == INT_TYPE) {
+			x = newLocalReg();
+			System.out.printf("  %%%d = icmp sle i32 %s, %s\n", x, y, z);
+
+		} else if (r.type == REAL_TYPE) {
+			x = newLocalReg();
+			System.out.printf("  %%%d = fcmp ole double %s, %s\n", x, y, z);
+
+		} else if (r.type == BOOL_TYPE) {
+			int convY = newLocalReg();
+			int convZ = newLocalReg();
+			x = newLocalReg();
+			System.out.printf("  %%%d = zext i1 %s to i32\n", convY, y);
+			System.out.printf("  %%%d = zext i1 %s to i32\n", convZ, z);
+			System.out.printf("  %%%d = icmp sle i32 %%%d, %%%d\n", x, convY, convZ);
+
+		} else if (r.type == STR_TYPE) {
+			System.out.println("Nequal STR_TYPE\n");
+
+		} else {
+			System.err.println("Nequal type not known!");
+		}
+
+		return String.format("%%%d", x);
+	}
+
+	@Override
+	protected String visitAnd(AST node) {
+		// Abstraindo a possibilidade de ser INT
+		AST l = node.getChild(0);
+		AST r = node.getChild(1);
+		String y = visit(l);
+		String z = visit(r);
+		int x = newLocalReg();
+
+		System.out.printf("  %%%d = and i1 %s, %s\n", x, y, z);
+
+		return String.format("%%%d", x);
+	}
+
+	@Override
+	protected String visitOr(AST node) {
+		// Abstraindo a possibilidade de ser INT
+		AST l = node.getChild(0);
+		AST r = node.getChild(1);
+		String y = visit(l);
+		String z = visit(r);
+		int x = newLocalReg();
+
+		System.out.printf("  %%%d = or i1 %s, %s\n", x, y, z);
+
+		return String.format("%%%d", x);
 	}
 
 	// @Override
-	// protected Integer visitBoolVal(AST node) {
-	// int x = newIntReg();
-	// int c = node.intData;
-	// emit(LDIi, x, c);
-	// return x;
-	// }
+	// protected String visitIf(AST node) {
+	// // O child 0 é o teste
+	// // O child 1 é o if
+	// // O child 2 é o else
 
-	// @Override
-	// protected Integer visitIf(AST node) {
-	// // Code for test.
-	// int testReg = visit(node.getChild(0));
-	// int condJumpInstr = nextInstr;
-	// emit(BOFb, testReg, 0); // Leave offset empty now, will be backpatched.
+	// String testReg = visit(node.getChild(0));
+	// int ifTrue = newJumpLabel();
+	// StringBuilder sb = new StringBuilder();
+	// Formatter f = new Formatter(sb);
+	// f.format(" br i1 %s, label %%jmp%d, label ", testReg, ifTrue);
+	// // System.out.printf(" br i1 %s, label %%%d, label %7\n")
+	// // System.out.printf(" br i1 %s, label %%%d, label %7\n", testReg, ifTrue);
 
-	// // Code for TRUE block.
-	// int trueBranchStart = nextInstr;
+	// System.out.printf("\n%d:\n", ifTrue);
+	// // int condJumpInstr = nextInstr;
+	// // emit(BOFb, testReg, 0); // Leave offset empty now, will be backpatched.
+
+	// // // Code for TRUE block.
+	// // int trueBranchStart = nextInstr;
 	// visit(node.getChild(1)); // Generate TRUE block.
+	// int ifFalse = newLocalReg();
+	// f.format("%%%d", ifFalse);
+	// System.out.println(f.toString());
+	// // // Code for FALSE block.
+	// // int falseBranchStart;
+	// // if (node.getChildCount() == 3) { // We have an else.
+	// // // Emit unconditional jump for TRUE block.
+	// // int uncondJumpInstr = nextInstr;
+	// // emit(JUMP, 0); // Leave address empty now, will be backpatched.
+	// // falseBranchStart = nextInstr;
+	// // visit(node.getChild(2)); // Generate FALSE block.
+	// // // Backpatch unconditional jump at end of TRUE block.
+	// // backpatchJump(uncondJumpInstr, nextInstr);
+	// // } else {
+	// // falseBranchStart = nextInstr;
+	// // }
 
-	// // Code for FALSE block.
-	// int falseBranchStart;
-	// if (node.getChildCount() == 3) { // We have an else.
-	// // Emit unconditional jump for TRUE block.
-	// int uncondJumpInstr = nextInstr;
-	// emit(JUMP, 0); // Leave address empty now, will be backpatched.
-	// falseBranchStart = nextInstr;
-	// visit(node.getChild(2)); // Generate FALSE block.
-	// // Backpatch unconditional jump at end of TRUE block.
-	// backpatchJump(uncondJumpInstr, nextInstr);
-	// } else {
-	// falseBranchStart = nextInstr;
-	// }
+	// // // Backpatch test.
+	// // backpatchBranch(condJumpInstr, falseBranchStart - trueBranchStart + 1);
 
-	// // Backpatch test.
-	// backpatchBranch(condJumpInstr, falseBranchStart - trueBranchStart + 1);
-
-	// return -1; // This is not an expression, hence no value to return.
+	// return "";
 	// }
 
 	@Override
-	protected Integer visitIntVal(AST node) {
-		int x = newLocalReg();
-		int c = node.intData;
-		System.out.printf("  %%%d = alloca i32\n", x);
-		System.out.printf("  store i32 %d, i32* %%%d\n", c, x);
-		return x;
+	protected String visitIntVal(AST node) {
+		String val = Integer.toString(node.intData);
+
+		return val;
 	}
 
-	// @Override
-	// protected Integer visitLt(AST node) {
-	// AST l = node.getChild(0);
-	// AST r = node.getChild(1);
-	// int y = visit(l);
-	// int z = visit(r);
-	// int x = newIntReg();
-	// if (r.type == REAL_TYPE) { // Could equally test 'l' here.
-	// emit(LTHf, x, y, z);
-	// } else if (r.type == INT_TYPE) {
-	// emit(LTHi, x, y, z);
-	// } else { // Must be STR_TYPE
-	// emit(LTHs, x, y, z);
-	// }
-	// return x;
-	// }
+	@Override
+	protected String visitRealVal(AST node) {
+		String val = Float.toString(node.floatData);
 
-	// @Override //TODO
-	// protected Integer visitGt(AST node) {
-	// }
+		return val;
+	}
 
-	// @Override //TODO
-	// protected Integer visitGe(AST node) {
-	// }
+	@Override
+	protected String visitStrVal(AST node) {
+		int index = node.intData;
 
-	// @Override //TODO
-	// protected Integer visitLe(AST node) {
-	// }
+		return String.format("@%d", index);
+	}
 
-	// @Override //TODO
-	// protected Integer visitAnd(AST node) {
-	// }
+	@Override
+	protected String visitCharVal(AST node) {
+		String val = Integer.toString(node.intData);
 
-	// @Override //TODO
-	// protected Integer visitOr(AST node) {
-	// }
+		return val;
+	}
 
-	// @Override //TODO
-	// protected Integer visitCharVal(AST node) {
-	// }
+	@Override
+	protected String visitBoolVal(AST node) {
+		boolean b;
+		if (node.intData == 0) {
+			b = false;
+		} else {
+			b = true;
+		}
+		String val = Boolean.toString(b);
+		return val;
+	}
 
 	@Override // TODO
-	protected Integer visitFunList(AST node) {
+	protected String visitFunList(AST node) {
 		// Not right now
-		return -1;
+		return "";
 	}
 
 	// @Override //TODO
@@ -252,106 +505,145 @@ public final class CodeGen extends ASTBaseVisitor<Integer> {
 	// protected Integer visitArrayAcc(AST node) {
 	// }
 
-	// @Override
-	// protected Integer visitMinus(AST node) {
-	// int x;
-	// int y = visit(node.getChild(0));
-	// int z = visit(node.getChild(1));
-	// if (node.type == REAL_TYPE) {
-	// x = newFloatReg();
-	// emit(SUBf, x, y, z);
-	// } else {
-	// x = newIntReg();
-	// emit(SUBi, x, y, z);
-	// }
-	// return x;
-	// }
-
-	// @Override
-	// protected Integer visitOver(AST node) {
-	// int x;
-	// int y = visit(node.getChild(0));
-	// int z = visit(node.getChild(1));
-	// if (node.type == REAL_TYPE) {
-	// x = newFloatReg();
-	// emit(DIVf, x, y, z);
-	// } else {
-	// x = newIntReg();
-	// emit(DIVi, x, y, z);
-	// }
-	// return x;
-	// }
-
-	// @Override
-	// protected Integer visitPlus(AST node) {
-	// int x;
-	// int y = visit(node.getChild(0));
-	// int z = visit(node.getChild(1));
-	// if (node.type == REAL_TYPE) {
-	// x = newFloatReg();
-	// emit(ADDf, x, y, z);
-	// } else if (node.type == INT_TYPE) {
-	// x = newIntReg();
-	// emit(ADDi, x, y, z);
-	// } else if (node.type == BOOL_TYPE) {
-	// x = newIntReg();
-	// emit(OROR, x, y, z);
-	// } else { // Must be STR_TYPE
-	// x = newIntReg();
-	// emit(CATs, x, y, z);
-	// }
-	// return x;
-	// }
-
 	@Override
-	protected Integer visitProgram(AST node) {
-		System.out.println("\ndefine void @main() {");
-		visit(node.getChild(0)); // var_list
-		visit(node.getChild(1)); // fun_list
-		visit(node.getChild(2)); // block
-		System.out.println("  ret void \n}");
+	protected String visitMinus(AST node) {
+		String y = visit(node.getChild(0));
+		String z = visit(node.getChild(1));
+		int x = newLocalReg();
 
-		for (String declare : declares) {
-			System.out.println(declare);
+		if (node.type == INT_TYPE) {
+			System.out.printf("  %%%d = sub i32 %s, %s\n", x, y, z);
+
+		} else if (node.type == REAL_TYPE) {
+			System.out.printf("  %%%d = fsub double %s, %s\n", x, y, z);
+
+		} else {
+			System.err.println("This type is impossible to sub");
 		}
-		return -1; // This is not an expression, hence no value to return.
+
+		return String.format("%%%d", x);
 	}
 
 	// @Override
-	// protected Integer visitRead(AST node) {
-	// AST var = node.getChild(0);
-	// int addr = var.intData;
-	// int x;
-	// if (var.type == INT_TYPE) {
-	// x = newIntReg();
-	// emit(CALL, 0, x);
-	// emit(STWi, addr, x);
-	// } else if (var.type == REAL_TYPE) {
-	// x = newFloatReg();
-	// emit(CALL, 1, x);
-	// emit(STWf, addr, x);
-	// } else if (var.type == BOOL_TYPE) {
-	// x = newIntReg();
-	// emit(CALL, 2, x);
-	// emit(STWi, addr, x);
-	// } else { // Must be STR_TYPE
-	// x = newIntReg();
-	// emit(CALL, 3, x);
-	// emit(STWi, addr, x);
-	// }
-	// return -1; // This is not an expression, hence no value to return.
-	// }
+	protected String visitOver(AST node) {
+		String y = visit(node.getChild(0));
+		String z = visit(node.getChild(1));
+		int x = newLocalReg();
+
+		if (node.type == INT_TYPE) {
+			System.out.printf("  %%%d = sdiv i32 %s, %s\n", x, y, z);
+
+		} else if (node.type == REAL_TYPE) {
+			System.out.printf("  %%%d = fdiv double %s, %s\n", x, y, z);
+
+		} else {
+			System.err.println("This type is impossible to divide");
+		}
+
+		return String.format("%%%d", x);
+	}
+
+	@Override
+	protected String visitPlus(AST node) {
+		String y = visit(node.getChild(0));
+		String z = visit(node.getChild(1));
+		int x = newLocalReg();
+
+		if (node.type == INT_TYPE) {
+			System.out.printf("  %%%d = add i32 %s, %s\n", x, y, z);
+		} else if (node.type == REAL_TYPE) {
+			System.out.printf("  %%%d = fadd double %s, %s\n", x, y, z);
+		} else if (node.type == STR_TYPE) {
+			// Concat
+		} else if (node.type == CHAR_TYPE) {
+			// Não sei se isso existe...
+		} else {
+			System.err.println("This type is impossible to add");
+		}
+
+		return String.format("%%%d", x);
+	}
 
 	// @Override
-	// protected Integer visitRealVal(AST node) {
-	// int x = newFloatReg();
-	// // We need to read as an int because the TM cannot handle floats directly.
-	// // But we have a float stored in the AST, so we just convert it as an int
-	// // and magically we have a float encoded as an int... :P
-	// int c = Float.floatToIntBits(node.floatData);
-	// emit(LDIf, x, c);
-	// return x;
-	// }
+	protected String visitTimes(AST node) {
+		String y = visit(node.getChild(0));
+		String z = visit(node.getChild(1));
+		int x = newLocalReg();
+
+		if (node.type == INT_TYPE) {
+			System.out.printf("  %%%d = mul i32 %s, %s\n", x, y, z);
+
+		} else if (node.type == REAL_TYPE) {
+			System.out.printf("  %%%d = fmul double %s, %s\n", x, y, z);
+
+		} else {
+			System.err.println("This type is impossible to mul");
+		}
+
+		return String.format("%%%d", x);
+	}
+
+	// Ignorar parametros no read (ex read(a,b) por enquanto
+	@Override
+	protected String visitRead(AST node) {
+		String printPrototype = "declare i32 @__isoc99_scanf(i8*, ...)";
+
+		if (!declares.contains(printPrototype))
+			declares.add(printPrototype);
+
+		AST var = node.getChild(0);
+		int addr = var.intData;
+		int x = 0;
+
+		if (var.type == INT_TYPE) {
+			if (!printStrs.containsKey(Print.INT)) {
+				int i = newGlobalReg();
+				Print p = Print.INT.setIndex(i);
+				printStrs.put(Print.INT, p);
+			}
+			int a = printStrs.get(Print.INT).index;
+			int pointer = newLocalReg();
+			x = newLocalReg();
+
+			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer, a);
+			System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, i32* %%%d)\n", x, pointer,
+					addr + 1);
+
+		} else if (var.type == REAL_TYPE) {
+			if (!printStrs.containsKey(Print.REAL)) {
+				int i = newGlobalReg();
+				Print p = Print.REAL.setIndex(i);
+				printStrs.put(Print.REAL, p);
+			}
+			int a = printStrs.get(Print.REAL).index;
+			int pointer = newLocalReg();
+			x = newLocalReg();
+
+			System.out.printf("  %%%d = getelementptr inbounds [4 x i8], [4 x i8]* @%d, i64 0, i64 0\n", pointer, a);
+			System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, double* %%%d)\n", x, pointer,
+					addr + 1);
+
+		} else if (var.type == CHAR_TYPE) {
+			if (!printStrs.containsKey(Print.CHAR)) {
+				int i = newGlobalReg();
+				Print p = Print.CHAR.setIndex(i);
+				printStrs.put(Print.CHAR, p);
+			}
+			int a = printStrs.get(Print.CHAR).index;
+			int pointer = newLocalReg();
+			x = newLocalReg();
+
+			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer, a);
+			System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, i8* %%%d)\n", x, pointer,
+					addr + 1);
+		} else if (var.type == STR_TYPE) {
+			// Segfault
+		} else {
+			System.err.printf("This type is impossible to read: %s\n", var.type);
+		}
+
+		return "";
+	}
 
 	// @Override
 	// protected Integer visitRepeat(AST node) {
@@ -363,86 +655,174 @@ public final class CodeGen extends ASTBaseVisitor<Integer> {
 	// }
 
 	@Override
-	protected Integer visitStrVal(AST node) {
-		int index = node.intData;
-		return index;
+	protected String visitVarDecl(AST node) {
+		int x = newLocalReg();
+		if (node.type == INT_TYPE) {
+			System.out.printf("  %%%d = alloca i32\n", x);
+
+		} else if (node.type == REAL_TYPE) {
+			System.out.printf("  %%%d = alloca double\n", x);
+
+		} else if (node.type == BOOL_TYPE) {
+			System.out.printf("  %%%d = alloca i1\n", x);
+
+		} else if (node.type == CHAR_TYPE) {
+			System.out.printf("  %%%d = alloca i8\n", x);
+
+		} else if (node.type == STR_TYPE) {
+			System.out.printf("  %%%d = alloca i8*\n", x);
+
+		} else {
+			System.err.println("Missing VarDecl!");
+		}
+		return "";
 	}
 
-	// @Override
-	// protected Integer visitTimes(AST node) {
-	// int x;
-	// int y = visit(node.getChild(0));
-	// int z = visit(node.getChild(1));
-	// if (node.type == REAL_TYPE) {
-	// x = newFloatReg();
-	// emit(MULf, x, y, z);
-	// } else {
-	// x = newIntReg();
-	// emit(MULi, x, y, z);
-	// }
-	// return x;
-	// }
-
-	// @Override
-	// protected Integer visitVarDecl(AST node) {
-	// // Nothing to do here.
-	// return -1; // This is not an expression, hence no value to return.
-	// }
-
 	@Override
-	protected Integer visitVarList(AST node) {
-		return -1;
+	protected String visitVarList(AST node) {
+		for (int i = 0; i < node.getChildrenSize(); i++) {
+			visit(node.getChild(i));
+		}
+		return "";
 	}
 
-	// @Override
-	// protected Integer visitVarUse(AST node) {
-	// int addr = node.intData;
-	// int x;
-	// if (node.type == REAL_TYPE) {
-	// x = newFloatReg();
-	// emit(LDWf, x, addr);
-	// } else {
-	// x = newIntReg();
-	// emit(LDWi, x, addr);
-	// }
-	// return x;
-	// }
-
 	@Override
-	protected Integer visitWrite(AST node) {
-		int pointer = newLocalReg();
-		int result = newLocalReg();
+	protected String visitVarUse(AST node) {
+		int x = newLocalReg();
+		int addr = node.intData;
+		if (node.type == INT_TYPE) {
+			System.out.printf("  %%%d = load i32, i32* %%%d\n", x, addr + 1);
 
-		// É necessário checar se a declaração já existe (hashmap ou lista)
-		declares.add("declare i32 @printf(i8*, ...)");
+		} else if (node.type == REAL_TYPE) {
+			System.out.printf("  %%%d = load double, double* %%%d\n", x, addr + 1);
 
-		AST expr = node.getChild(0);
-		int x = visit(expr);
+		} else if (node.type == BOOL_TYPE) {
+			System.out.printf("  %%%d = load i1, i1* %%%d\n", x, addr + 1);
 
-		switch (expr.type) {
-			// case INT_TYPE:
-			// emit(CALL, 4, x);
-			// break;
-			// case REAL_TYPE:
-			// emit(CALL, 5, x);
-			// break;
-			// case BOOL_TYPE:
-			// emit(CALL, 6, x);
-			// break;
-			case STR_TYPE:
-				String s = st.getString(x);
-				int len = s.length() + 1;
-				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* @%d, i64 0, i64 0\n", pointer,
-						len, len, x);
-				System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d)\n", result, pointer);
-				break;
-			case NO_TYPE:
-			default:
-				System.err.printf("Invalid type: %s!\n", expr.type.toString());
-				System.exit(1);
+		} else if (node.type == CHAR_TYPE) {
+			System.out.printf("  %%%d = load i8, i8* %%%d\n", x, addr + 1);
+
+		} else if (node.type == STR_TYPE) {
+			System.out.printf("  %%%d = load i8*, i8** %%%d\n", x, addr + 1);
+
+		} else {
+			System.err.println("Missing VarUse!");
 		}
 
-		return -1; // This is not an expression, hence no value to return.
+		return String.format("%%%d", x);
+	}
+
+	// Ignorar parametros no write (ex write(1,2, 'Hey')) por enquanto
+	@Override
+	protected String visitWrite(AST node) {
+		String printPrototype = "declare i32 @printf(i8*, ...)";
+
+		if (!declares.contains(printPrototype))
+			declares.add(printPrototype);
+
+		AST expr = node.getChild(0);
+		String x = visit(expr);
+
+		if (expr.type == STR_TYPE) {
+			int pointer = newLocalReg();
+			int result = newLocalReg();
+
+			// O parâmetro string do write pode vir de uma string pura (@)
+			// ou de um registrador (%).
+			// Sendo de um registrador não tem como saber o tamanho dela
+			if (x.startsWith("@")) {
+				// Pega a string salva para obter o tamanho dela
+				String s = st.getString(Integer.parseInt(x.substring(1)));
+				int len = s.length() + 1;
+
+				System.out.printf("  %%%d = getelementptr inbounds [%d x i8], [%d x i8]* %s, i64 0, i64 0\n",
+						pointer,
+						len, len, x);
+				System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d)\n", result,
+						pointer);
+			} else {
+				if (!printStrs.containsKey(Print.STR)) {
+					int i = newGlobalReg();
+					Print p = Print.STR.setIndex(i);
+					printStrs.put(Print.STR, p);
+				}
+				int a = printStrs.get(Print.STR).index;
+
+				System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n",
+						pointer,
+						a);
+				System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i8* %s)\n", result, pointer, x);
+			}
+
+		} else if (expr.type == REAL_TYPE) {
+			int pointer = newLocalReg();
+			int result = newLocalReg();
+
+			// Caso ainda não haja uma string de impressão de reais,
+			// ("%f"), adiciona ela
+			if (!printStrs.containsKey(Print.REAL)) {
+				int i = newGlobalReg();
+				Print p = Print.REAL.setIndex(i);
+				printStrs.put(Print.REAL, p);
+			}
+			int a = printStrs.get(Print.REAL).index;
+
+			System.out.printf("  %%%d = getelementptr inbounds [4 x i8], [4 x i8]* @%d, i64 0, i64 0\n", pointer,
+					a);
+			System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, double %s)\n", result, pointer, x);
+
+		} else if (expr.type == INT_TYPE) {
+			int pointer = newLocalReg();
+			int result = newLocalReg();
+
+			if (!printStrs.containsKey(Print.INT)) {
+				int i = newGlobalReg();
+				Print p = Print.INT.setIndex(i);
+				printStrs.put(Print.INT, p);
+			}
+			int a = printStrs.get(Print.INT).index;
+
+			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
+					a);
+			System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i32 %s)\n", result, pointer, x);
+
+		} else if (expr.type == BOOL_TYPE) {
+			int pointer = newLocalReg();
+			int result = newLocalReg();
+
+			// Vamos imprimir como um inteiro, já que o printf não tem bool
+			if (!printStrs.containsKey(Print.INT)) {
+				int i = newGlobalReg();
+				Print p = Print.INT.setIndex(i);
+				printStrs.put(Print.INT, p);
+			}
+			int a = printStrs.get(Print.INT).index;
+
+			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
+					a);
+			System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i1 %s)\n", result, pointer, x);
+
+		} else if (expr.type == CHAR_TYPE) {
+			int pointer = newLocalReg();
+			int result = newLocalReg();
+
+			if (!printStrs.containsKey(Print.CHAR)) {
+				int i = newGlobalReg();
+				Print p = Print.CHAR.setIndex(i);
+				printStrs.put(Print.CHAR, p);
+			}
+			int a = printStrs.get(Print.CHAR).index;
+
+			System.out.printf("  %%%d = getelementptr inbounds [3 x i8], [3 x i8]* @%d, i64 0, i64 0\n", pointer,
+					a);
+			System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d, i8 %s)\n", result, pointer, x);
+
+		} else {
+			System.err.printf("Invalid type: %s!\n", expr.type.toString());
+			System.exit(1);
+		}
+
+		return "";
 	}
 
 	// @Override //TODO
@@ -476,20 +856,22 @@ public final class CodeGen extends ASTBaseVisitor<Integer> {
 	// return x;
 	// }
 
-	// @Override
-	// protected Integer visitI2R(AST node) {
-	// int i = visit(node.getChild(0));
-	// int r = newFloatReg();
-	// emit(WIDf, r, i);
-	// return r;
-	// }
+	@Override
+	protected String visitI2R(AST node) {
+		String i = visit(node.getChild(0));
+		int r = newLocalReg();
+		System.out.printf("  %%%d = sitofp i32 %s to double\n", r, i);
+
+		return String.format("%%%d", r);
+	}
 
 	// @Override
-	// protected Integer visitI2S(AST node) {
-	// int x = newIntReg();
-	// int y = visit(node.getChild(0));
-	// emit(I2Ss, x, y);
-	// return x;
+	// protected String visitI2S(AST node) {
+	// String i = visit(node.getChild(0));
+	// int r = newLocalReg();
+	// System.out.printf(" %%%d = sitofp i32 %s to double\n", r, i);
+
+	// return String.format("%%%d", r);
 	// }
 
 	// @Override

@@ -20,8 +20,8 @@ BIN_PATH=bin
 
 # Directory for the test cases
 DATA=$(ROOT)/tests
-IN=$(DATA)/cp2/in
-OUT=$(DATA)/cp2/out
+IN=$(DATA)/cp3/in
+OUT=$(DATA)/cp3/out
 
 FILE=
 OUT_FILE = $(OUT)/$(basename $(notdir $(FILE))).dot
@@ -30,17 +30,17 @@ all: antlr javac
 	@echo "Done."
 
 antlr: pascalLexer.g4 pascalParser.g4
-	$(ANTLR4) -no-listener -visitor -o $(GEN_PATH) -package $(GEN_PATH) pascalLexer.g4 pascalParser.g4
+	@$(ANTLR4) -no-listener -visitor -o $(GEN_PATH) -package $(GEN_PATH) pascalLexer.g4 pascalParser.g4
 
 javac:
 	@rm -rf $(BIN_PATH)
 	@mkdir $(BIN_PATH)
-	$(JAVAC) $(CLASS_PATH_OPTION) -d $(BIN_PATH) */*.java
+	@$(JAVAC) $(CLASS_PATH_OPTION) -d $(BIN_PATH) */*.java
 
 $(OUT_FILE) dot:
 	@mkdir -p $(OUT)
 	
-	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(OUT_FILE)
+	@$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(OUT_FILE)
 	@dot -Tpng $(OUT_FILE) -o $(basename $(OUT_FILE)).png 
 
 # Para gerar um arquivo na mesma pasta (EX:make file FILE=tests/cp3/in/strings.pas)
@@ -50,7 +50,7 @@ file:
 
 # Para imprimir no terminal (EX:make run FILE=tests/cp3/in/strings.pas)
 run:
-	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE)
+	@$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE)
 
 # Run all tests
 runall:
