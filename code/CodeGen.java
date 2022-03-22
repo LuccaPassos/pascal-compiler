@@ -6,7 +6,6 @@ import ast.NodeKind;
 import static ast.NodeKind.ARRAY_ACCESS;
 import tables.VariableTable;
 import tables.StringTable;
-import tables.FunctionTable;
 import typing.Type;
 import static typing.Type.INT_TYPE;
 import static typing.Type.REAL_TYPE;
@@ -16,19 +15,14 @@ import static typing.Type.CHAR_TYPE;
 import static typing.Type.ARRAY_TYPE;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Formatter;
 import java.util.HashMap;
 
-import org.antlr.runtime.tree.RewriteRuleNodeStream;
-
-// Declarar o tipo como string permite que nós retornem valores diversos, 
-// a serem tratados dentro dos pais
-// Os valores de ponto flutuante foram tratados como double devido a 
-// peculiaridades da LLVM (ex não aceitar o literal float 1.3)
+// Setting the return type as string allows us to be more versatile.
+// Floating point values were handled with type double, because of
+// LLVM peculiarities 
 public final class CodeGen extends ASTBaseVisitor<String> {
 
-	// private final Instruction code[]; // Code memory
 	private final StringTable st;
 	private final VariableTable gvt; // global
 
@@ -104,7 +98,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return globalRegsCount++;
 	}
 
-	// É necessário mudar para múltiplas funções, com múltiplos escopos
+	// This would be changed to handle multiple function scopes
 	private int newLocalReg() {
 		return localRegsCount++;
 	}
@@ -136,7 +130,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		for (int i = 0; i < node.getChildrenSize(); i++) {
 			visit(node.getChild(i));
 		}
-		return ""; // This is not an expression, hence no value to return.
+		return "";
 	}
 
 	@Override
@@ -153,7 +147,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			int reg = Integer.parseInt(visit(l).substring(1));
 			String type = ArrayVar.getSingleType(l.type);
 
-			// Abstraindo atribuição de string a array
+			// Not handling string assign to array
 			System.out.printf("  store %s %s, %s* %%%d\n", type, x, type, reg - 1);
 
 		} else if (varType == INT_TYPE) {
@@ -169,7 +163,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			System.out.printf("  store i8 %s, i8* %%%d\n", x, addr + 1);
 
 		} else if (varType == STR_TYPE) {
-			// A string pode ser pura (@str) ou de um registrador (%num)
+			// String can be pure (@str), which the pointer is needed,
+			// or form register (%num)
 			if (x.startsWith("@")) {
 				int pointer = newLocalReg();
 				String s = st.getString(Integer.parseInt(x.substring(1)));
@@ -214,7 +209,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			if (!declares.contains(compPrototype))
 				declares.add(compPrototype);
 
-			// Se as strings forem puras, precisa do ponteiro delas
 			if (y.startsWith("@")) {
 				int b = newLocalReg();
 				String s = st.getString(Integer.parseInt(y.substring(1)));
@@ -240,7 +234,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			x = newLocalReg();
 
 			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
-			// Se o valor for = 0, zero as string são iguais
+			// If val = 0, strings are the same
 			System.out.printf("  %%%d = icmp eq i32 %%%d, 0\n", x, a);
 
 		} else {
@@ -274,7 +268,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			if (!declares.contains(compPrototype))
 				declares.add(compPrototype);
 
-			// Se as strings forem puras, precisa do ponteiro delas
 			if (y.startsWith("@")) {
 				int b = newLocalReg();
 				String s = st.getString(Integer.parseInt(y.substring(1)));
@@ -300,7 +293,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			x = newLocalReg();
 
 			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
-			// Se o valor for != 0, as string são diferentes
+			// // If val != 0, strings are the different
 			System.out.printf("  %%%d = icmp ne i32 %%%d, 0\n", x, a);
 
 		} else {
@@ -338,7 +331,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			if (!declares.contains(compPrototype))
 				declares.add(compPrototype);
 
-			// Se as strings forem puras, precisa do ponteiro delas
 			if (y.startsWith("@")) {
 				int b = newLocalReg();
 				String s = st.getString(Integer.parseInt(y.substring(1)));
@@ -364,7 +356,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			x = newLocalReg();
 
 			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
-			// Se o valor for < 0 as string y é antes de z
+
+			// If val < 0, y is before z
 			System.out.printf("  %%%d = icmp slt i32 %%%d, 0\n", x, a);
 		} else {
 			System.err.println("Lt type not known!");
@@ -401,7 +394,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			if (!declares.contains(compPrototype))
 				declares.add(compPrototype);
 
-			// Se as strings forem puras, precisa do ponteiro delas
 			if (y.startsWith("@")) {
 				int b = newLocalReg();
 				String s = st.getString(Integer.parseInt(y.substring(1)));
@@ -427,7 +419,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			x = newLocalReg();
 
 			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
-			// Se o valor for > 0 as string y é depois de z
+
+			// If val > 0, z is before y
 			System.out.printf("  %%%d = icmp sgt i32 %%%d, 0\n", x, a);
 
 		} else {
@@ -465,7 +458,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			if (!declares.contains(compPrototype))
 				declares.add(compPrototype);
 
-			// Se as strings forem puras, precisa do ponteiro delas
 			if (y.startsWith("@")) {
 				int b = newLocalReg();
 				String s = st.getString(Integer.parseInt(y.substring(1)));
@@ -491,7 +483,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			x = newLocalReg();
 
 			System.out.printf("  %%%d = call i32 @strcmp(i8* %s, i8* %s)\n", a, y, z);
-			// Se o valor for > 0 as string y é depois de z
+			// // If val >= 0, z is before y
 			System.out.printf("  %%%d = icmp sge i32 %%%d, 0\n", x, a);
 
 		} else {
@@ -529,7 +521,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			if (!declares.contains(compPrototype))
 				declares.add(compPrototype);
 
-			// Se as strings forem puras, precisa do ponteiro delas
 			if (y.startsWith("@")) {
 				int b = newLocalReg();
 				String s = st.getString(Integer.parseInt(y.substring(1)));
@@ -566,7 +557,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 
 	@Override
 	protected String visitAnd(AST node) {
-		// Abstraindo a possibilidade de ser INT
+		// Not handling INT type
 		AST l = node.getChild(0);
 		AST r = node.getChild(1);
 		String y = visit(l);
@@ -580,7 +571,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 
 	@Override
 	protected String visitOr(AST node) {
-		// Abstraindo a possibilidade de ser INT
+		// Not handling INT type
 		AST l = node.getChild(0);
 		AST r = node.getChild(1);
 		String y = visit(l);
@@ -636,6 +627,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return val;
 	}
 
+	// Ideally would return pure string pointer
 	@Override
 	protected String visitStrVal(AST node) {
 		int index = node.intData;
@@ -664,7 +656,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 
 	@Override // TODO
 	protected String visitFunList(AST node) {
-		// Not right now
 		return "";
 	}
 
@@ -753,19 +744,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			x = newLocalReg();
 			System.out.printf("  %%%d = fadd double %s, %s\n", x, y, z);
 		} else if (node.type == STR_TYPE) {
-			// if (!declares.contains(strPrototype))
-			// declares.add(strPrototype);
-
-			// int a = newLocalReg();
-			// int b = newLocalReg();
-			// int c = newLocalReg();
-			// x = newLocalReg();
-			// System.out.printf(" %%%d = alloca [100 x i8]\n", a);
-			// System.out.printf(" %%%d = getelementptr inbounds [100 x i8], [100 x i8]*
-			// %%%d, i64 0, i64 0\n", b, a);
-
-			// System.out.printf(" %%%d = call i8* @strcpy(i8* %%%d, i8* %s)\n", c, b, y);
-			// System.out.printf(" %%%d = call i8* @strcat(i8* %%%d, i8* %s)\n", x, b, z);
+			// Requires LLVM memory handling to avoid degmentation faults
+			// could be handled with @strcat
 		} else {
 			System.err.println("This type is impossible to add");
 		}
@@ -847,7 +827,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 				System.out.printf("  %%%d = call i32 (i8*, ...) @__isoc99_scanf(i8* %%%d, i8* %%%d)\n", x, pointer,
 						addr + 1);
 			} else if (var.type == STR_TYPE) {
-				// Segfault
+				// Requires LLVM memory handling to avoid degmentation faults
+				// could be handled with @strcat
 			} else {
 				System.err.printf("This type is impossible to read: %s\n", var.type);
 			}
@@ -971,11 +952,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 				int pointer = newLocalReg();
 				int result = newLocalReg();
 
-				// O parâmetro string do write pode vir de uma string pura (@)
-				// ou de um registrador (%).
-				// Sendo de um registrador não tem como saber o tamanho dela
 				if (x.startsWith("@")) {
-					// Pega a string salva para obter o tamanho dela
 					String s = st.getString(Integer.parseInt(x.substring(1)));
 					int len = s.length() + 1;
 
@@ -985,6 +962,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 					System.out.printf("  %%%d = call i32 (i8*, ...) @printf(i8* %%%d)\n", result,
 							pointer);
 				} else {
+					// If there isn't the printf string to print STR type
+					// ("%s\00"), adds it.
 					if (!printStrs.containsKey(Print.STR)) {
 						int i = newGlobalReg();
 						Print p = Print.STR.setIndex(i);
@@ -1002,8 +981,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 				int pointer = newLocalReg();
 				int result = newLocalReg();
 
-				// Caso ainda não haja uma string de impressão de reais,
-				// ("%f"), adiciona ela
 				if (!printStrs.containsKey(Print.REAL)) {
 					int i = newGlobalReg();
 					Print p = Print.REAL.setIndex(i);
@@ -1034,7 +1011,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 				int pointer = newLocalReg();
 				int result = newLocalReg();
 
-				// Vamos imprimir como um inteiro, já que o printf não tem bool
+				// Printing as INT, as printf doesn't have bool
 				if (!printStrs.containsKey(Print.INT)) {
 					int i = newGlobalReg();
 					Print p = Print.INT.setIndex(i);
@@ -1070,7 +1047,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return "";
 	}
 
-	@Override // TODO
+	@Override
 	protected String visitC2S(AST node) {
 		String i = visit(node.getChild(0));
 		int a = newLocalReg();
@@ -1082,7 +1059,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return String.format("%%%d", b);
 	}
 
-	// @Override //TODO
+	// @Override
 	// protected Integer visitS2C(AST node) {
 	// }
 
@@ -1136,6 +1113,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	// }
 }
 
+// Class to handle de use of array type variables
 class ArrayVar {
 	public Integer dimension;
 	private String type;
