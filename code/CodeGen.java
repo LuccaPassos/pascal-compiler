@@ -2,6 +2,8 @@ package code;
 
 import ast.AST;
 import ast.ASTBaseVisitor;
+import ast.NodeKind;
+import static ast.NodeKind.ARRAY_ACCESS;
 import tables.VariableTable;
 import tables.StringTable;
 import tables.FunctionTable;
@@ -14,8 +16,11 @@ import static typing.Type.CHAR_TYPE;
 import static typing.Type.ARRAY_TYPE;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Formatter;
 import java.util.HashMap;
+
+import org.antlr.runtime.tree.RewriteRuleNodeStream;
 
 // Declarar o tipo como string permite que nós retornem valores diversos, 
 // a serem tratados dentro dos pais
@@ -29,6 +34,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 
 	private static ArrayList<String> declares;
 	private static HashMap<Print, Print> printStrs;
+
+	private static HashMap<Integer, ArrayVar> arrayVarList;
 
 	private static StringBuilder sb;
 	private static Formatter strs;
@@ -46,10 +53,11 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	public CodeGen(StringTable stringTable, VariableTable variableTable) {
 		this.st = stringTable;
 		this.gvt = variableTable;
-		declares = new ArrayList<String>();
-		printStrs = new HashMap<Print, Print>();
+		declares = new ArrayList<>();
+		printStrs = new HashMap<>();
 		sb = new StringBuilder();
 		strs = new Formatter(sb);
+		arrayVarList = new HashMap<>();
 	}
 
 	public void execute(AST root) {
@@ -133,12 +141,22 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 
 	@Override
 	protected String visitAssign(AST node) {
-		int addr = node.getChild(0).intData;
+		AST l = node.getChild(0);
 		AST r = node.getChild(1);
 		String x = visit(r);
+		int addr = l.intData;
 		Type varType = gvt.getType(addr);
+		NodeKind nodeKind = l.kind;
 
-		if (varType == INT_TYPE) {
+		if (nodeKind == ARRAY_ACCESS) {
+			// Ignores load from varUse
+			int reg = Integer.parseInt(visit(l).substring(1));
+			String type = ArrayVar.getSingleType(l.type);
+
+			// Abstraindo atribuição de string a array
+			System.out.printf("  store %s %s, %s* %%%d\n", type, x, type, reg - 1);
+
+		} else if (varType == INT_TYPE) {
 			System.out.printf("  store i32 %s, i32* %%%d\n", x, addr + 1);
 
 		} else if (varType == REAL_TYPE) {
@@ -166,10 +184,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 				System.out.printf("  store i8* %s, i8** %%%d\n", x, addr + 1);
 
 			}
-
-		} else if (varType == ARRAY_TYPE) {
-			System.out.printf("Assign ARRAY_TYPE\n");
-
 		} else {
 			System.err.println("Assign type not known!");
 		}
@@ -662,9 +676,31 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	// protected Integer visitFunUse(AST node) {
 	// }
 
-	// @Override //TODO
-	// protected Integer visitArrayAcc(AST node) {
-	// }
+	@Override
+	protected String visitArrayAcc(AST node) {
+		AST l = node.getChild(0);
+		int addr = l.intData;
+
+		// First iteration
+		ArrayVar arr = arrayVarList.get(addr);
+		String arrayType = arr.getInnerArrayType(0);
+		String idx = visit(node.getChild(1));
+		int reg = newLocalReg();
+
+		System.out.printf("  %%%d = getelementptr inbounds %s, %s* %%%d, i32 0, i32 %s\n", reg, arrayType, arrayType,
+				addr + 1, idx);
+
+		for (int i = 1, j = 2; i < arr.getDimension(); i++, j++) {
+			reg = newLocalReg();
+			arrayType = arr.getInnerArrayType(i);
+			idx = visit(node.getChild(j));
+			System.out.printf("  %%%d = getelementptr inbounds %s, %s* %%%d, i32 0, i32 %s\n", reg, arrayType,
+					arrayType, reg - 1, idx);
+		}
+		String loadReg = visit(l);
+		System.out.printf("%%%d\n", reg);
+		return loadReg;
+	}
 
 	@Override
 	protected String visitMinus(AST node) {
@@ -685,7 +721,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return String.format("%%%d", x);
 	}
 
-	// @Override
+	@Override
 	protected String visitOver(AST node) {
 		String y = visit(node.getChild(0));
 		String z = visit(node.getChild(1));
@@ -737,7 +773,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return String.format("%%%d", x);
 	}
 
-	// @Override
+	@Override
 	protected String visitTimes(AST node) {
 		String y = visit(node.getChild(0));
 		String z = visit(node.getChild(1));
@@ -856,6 +892,26 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		} else if (node.type == STR_TYPE) {
 			System.out.printf("  %%%d = alloca i8*\n", x);
 
+		} else if (node.type == ARRAY_TYPE) {
+			int idx = node.intData;
+			Type contentType = gvt.getContentType(idx);
+			ArrayList<Integer[]> arrRanges = gvt.getRanges(idx);
+
+			StringBuilder sb = new StringBuilder();
+			Formatter formatter = new Formatter(sb);
+
+			formatter.format("  %%%d = alloca ", x);
+
+			ArrayVar arr = new ArrayVar(contentType, arrRanges.size());
+			for (Integer[] range : arrRanges) {
+				arr.addLength((range[1] - range[0]));
+			}
+			arrayVarList.put(idx, arr);
+
+			formatter.format("%s", arrayVarList.get(idx).getInnerArrayType(0));
+
+			System.out.println(formatter.toString());
+			formatter.close();
 		} else {
 			System.err.println("Missing VarDecl!");
 		}
@@ -874,6 +930,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	protected String visitVarUse(AST node) {
 		int x = newLocalReg();
 		int addr = node.intData;
+
 		if (node.type == INT_TYPE) {
 			System.out.printf("  %%%d = load i32, i32* %%%d\n", x, addr + 1);
 
@@ -888,6 +945,11 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 
 		} else if (node.type == STR_TYPE) {
 			System.out.printf("  %%%d = load i8*, i8** %%%d\n", x, addr + 1);
+
+		} else if (node.type == ARRAY_TYPE) {
+			Type contentType = gvt.getContentType(addr);
+			String type = ArrayVar.getSingleType(contentType);
+			System.out.printf("  %%%d = load %s, %s* ", x, type, type);
 
 		} else {
 			System.err.println("Missing VarUse!");
@@ -1072,4 +1134,57 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	// emit(R2Ss, x, y);
 	// return x;
 	// }
+}
+
+class ArrayVar {
+	public Integer dimension;
+	private String type;
+	private ArrayList<Integer> lengths;
+
+	ArrayVar(Type contentType, Integer dimension) {
+		this.dimension = dimension;
+		this.lengths = new ArrayList<>();
+		type = getSingleType(contentType);
+	}
+
+	public static String getSingleType(Type contentType) {
+		String type = "";
+		if (contentType == INT_TYPE) {
+			type = "i32";
+		} else if (contentType == REAL_TYPE) {
+			type = "double";
+		} else if (contentType == BOOL_TYPE) {
+			type = "i1";
+		} else if (contentType == CHAR_TYPE || contentType == STR_TYPE) {
+			type = "i8";
+		}
+		return type;
+	}
+
+	public Integer getDimension() {
+		return this.dimension;
+	}
+
+	public void addLength(int len) {
+		lengths.add(len);
+	}
+
+	public String getInnerArrayType(int dim) {
+		StringBuilder sb = new StringBuilder();
+		Formatter formatter = new Formatter(sb);
+
+		if (dim >= dimension)
+			dim = dimension - 1;
+
+		for (int i = dim; i < dimension; i++) {
+			formatter.format("[%d x ", lengths.get(i));
+		}
+
+		formatter.format("%s", type);
+		formatter.format("]".repeat(dimension - dim));
+
+		String s = formatter.toString();
+		formatter.close();
+		return s;
+	}
 }

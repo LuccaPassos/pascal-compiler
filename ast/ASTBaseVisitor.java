@@ -47,8 +47,8 @@ public abstract class ASTBaseVisitor<T> {
 			// return visitFunDecl(node);
 			// case FUN_USE_NODE:
 			// return visitFunUse(node);
-			// case ARRAY_ACCESS:
-			// return visitArrayAcc(node);
+			case ARRAY_ACCESS:
+				return visitArrayAcc(node);
 			case MINUS_NODE:
 				return visitMinus(node);
 			case OVER_NODE:
@@ -134,7 +134,7 @@ public abstract class ASTBaseVisitor<T> {
 
 	// protected abstract T visitFunUse(AST node);
 
-	// protected abstract T visitArrayAcc(AST node);
+	protected abstract T visitArrayAcc(AST node);
 
 	protected abstract T visitMinus(AST node);
 
