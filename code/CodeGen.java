@@ -3,8 +3,11 @@ package code;
 import ast.AST;
 import ast.ASTBaseVisitor;
 import ast.NodeKind;
+import scope.Scope;
+
 import static ast.NodeKind.ARRAY_ACCESS;
 import tables.VariableTable;
+import tables.FunctionTable;
 import tables.StringTable;
 import typing.Type;
 import static typing.Type.INT_TYPE;
@@ -24,14 +27,23 @@ import java.util.HashMap;
 public final class CodeGen extends ASTBaseVisitor<String> {
 
 	private final StringTable st;
-	private final VariableTable gvt; // global
+	private final FunctionTable ft;
+
+	// private final VariableTable gvt; // global
+	private VariableTable currentVt;
+
+	private final Scope globalScope;
+	private Scope currentScope;
+
+	// Function helpers
+	private Boolean isFunctionScope;
+	private int funcParamsNum;
 
 	private static ArrayList<String> declares;
 	private static HashMap<Print, Print> printStrs;
 
 	private static HashMap<Integer, ArrayVar> arrayVarList;
 
-	private static StringBuilder sb;
 	private static Formatter strs;
 
 	private static int globalRegsCount;
@@ -41,16 +53,20 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	private static String compPrototype = "declare i32 @strcmp(i8*, i8*)";
 	private static String scanPrototype = "declare i32 @__isoc99_scanf(i8*, ...)";
 	private static String printPrototype = "declare i32 @printf(i8*, ...)";
-	// private static String strPrototype = "declare i8* @strcpy(i8*, i8*)\ndeclare
-	// i8* @strcat(i8*, i8*)";
 
-	public CodeGen(StringTable stringTable, VariableTable variableTable) {
+	public CodeGen(
+			StringTable stringTable,
+			Scope globalScope) {
+
 		this.st = stringTable;
-		this.gvt = variableTable;
+		this.globalScope = globalScope;
+
+		currentVt = globalScope.getVaraibleTable();
+		ft = globalScope.getFunctionTable();
+
 		declares = new ArrayList<>();
 		printStrs = new HashMap<>();
-		sb = new StringBuilder();
-		strs = new Formatter(sb);
+		strs = new Formatter();
 		arrayVarList = new HashMap<>();
 	}
 
@@ -82,7 +98,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	}
 
 	private void dumpStrings() {
-		System.out.println(sb.toString());
+		System.out.println(strs.toString());
+		strs.close();
 	}
 
 	private void dumpFuncDeclare() {
@@ -98,11 +115,16 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return globalRegsCount++;
 	}
 
-	// This would be changed to handle multiple function scopes
+	private void resetLocalScope() {
+		localRegsCount = 1;
+		jumpLabel = 0;
+	}
+
 	private int newLocalReg() {
 		return localRegsCount++;
 	}
 
+	// This would be changed to handle multiple function scopes
 	private int newJumpLabel() {
 		return jumpLabel++;
 	}
@@ -111,9 +133,16 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	protected String visitProgram(AST node) {
 		getStringTable();
 
+		// Define functions first
+		visit(node.getChild(1));
+
+		currentScope = globalScope;
+		currentVt = globalScope.getVaraibleTable();
+		resetLocalScope();
+
 		System.out.println("\ndefine void @main() {");
 		visit(node.getChild(0)); // var_list
-		visit(node.getChild(1)); // fun_list
+
 		visit(node.getChild(2)); // block
 		System.out.println("  ret void \n}\n");
 
@@ -139,7 +168,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		AST r = node.getChild(1);
 		String x = visit(r);
 		int addr = l.intData;
-		Type varType = gvt.getType(addr);
+		Type varType = currentVt.getType(addr);
 		NodeKind nodeKind = l.kind;
 
 		if (nodeKind == ARRAY_ACCESS) {
@@ -623,7 +652,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	@Override
 	protected String visitRealVal(AST node) {
 		String val = Float.toString(node.floatData);
-
 		return val;
 	}
 
@@ -654,18 +682,95 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		return val;
 	}
 
-	@Override // TODO
+	@Override
 	protected String visitFunList(AST node) {
+		isFunctionScope = true;
+		for (int i = 0; i < node.getChildrenSize(); i++) {
+			visit(node.getChild(i));
+		}
+		isFunctionScope = false;
 		return "";
 	}
 
-	// @Override //TODO
-	// protected Integer visitFunDecl(AST node) {
-	// }
+	@Override
+	protected String visitFunDecl(AST node) {
+		int addr = node.intData;
+		String funcName = ft.getName(addr);
+		ArrayList<Type> params = ft.getParameters(addr);
 
-	// @Override //TODO
-	// protected Integer visitFunUse(AST node) {
-	// }
+		currentScope = ft.getScope(addr);
+		currentVt = currentScope.getVaraibleTable();
+		funcParamsNum = params.size();
+
+		resetLocalScope();
+
+		StringBuilder paramsBuilder = new StringBuilder();
+		for (int i = 1; i <= funcParamsNum; i++) {
+			String paramType = ArrayVar.getSingleType(params.get(i - 1));
+			String paramName = currentVt.getName(i);
+
+			paramsBuilder.append(
+					String.format("%s %%%s, ", paramType, paramName));
+
+		}
+
+		String funcType = ArrayVar.getSingleType(node.type);
+
+		String funcParams;
+		if (funcParamsNum > 0) {
+			funcParams = paramsBuilder.substring(0, paramsBuilder.length() - 2);
+		} else {
+			funcParams = "";
+		}
+
+		// Every function has at least a parameter and
+		// a return.
+		System.out.printf("\ndefine %s @%s(%s) {\n",
+				funcType,
+				funcName,
+				funcParams);
+
+		visit(node.getChild(0)); // var_list
+		visit(node.getChild(1)); // block
+
+		int ret = newLocalReg();
+
+		System.out.printf("  %%%d = load %s, %s* %%1\n",
+				ret,
+				funcType,
+				funcType);
+		System.out.printf("  ret %s %%%d \n}\n", funcType, ret);
+
+		return "";
+	}
+
+	@Override
+	protected String visitFunUse(AST node) {
+		String type = ArrayVar.getSingleType(node.type);
+
+		String funcName = ft.getName(node.intData);
+
+		StringBuilder paramsBuilder = new StringBuilder();
+
+		for (int i = 0; i < node.getChildrenSize(); i++) {
+			AST child = node.getChild(i);
+			String param = visit(child);
+			String paramType = ArrayVar.getSingleType(child.type);
+			paramsBuilder.append(String.format("%s %s, ", paramType, param));
+		}
+
+		String funcParams;
+		if (funcParamsNum > 0) {
+			funcParams = paramsBuilder.substring(0, paramsBuilder.length() - 2);
+		} else {
+			funcParams = "";
+		}
+
+		int x = newLocalReg();
+		System.out.printf("  %%%d = call %s @%s(%s)\n", x, type, funcName, funcParams);
+
+		return String.format("%%%d", x);
+	}
 
 	@Override
 	protected String visitArrayAcc(AST node) {
@@ -875,8 +980,8 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 
 		} else if (node.type == ARRAY_TYPE) {
 			int idx = node.intData;
-			Type contentType = gvt.getContentType(idx);
-			ArrayList<Integer[]> arrRanges = gvt.getRanges(idx);
+			Type contentType = currentVt.getContentType(idx);
+			ArrayList<Integer[]> arrRanges = currentVt.getRanges(idx);
 
 			StringBuilder sb = new StringBuilder();
 			Formatter formatter = new Formatter(sb);
@@ -896,6 +1001,30 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 		} else {
 			System.err.println("Missing VarDecl!");
 		}
+
+		if (isFunctionScope) {
+			// Return variable or local variables
+			if (x == 1 || node.intData > funcParamsNum) {
+				return "";
+			}
+			String paramName = currentVt.getName(x - 1);
+			if (node.type == INT_TYPE) {
+				System.out.printf("  store i32 %%%s, i32* %%%d\n", paramName, x);
+
+			} else if (node.type == REAL_TYPE) {
+				System.out.printf("  store double %%%s, double* %%%d\n", paramName, x);
+
+			} else if (node.type == BOOL_TYPE) {
+				System.out.printf("  store i1 %%%s, i1* %%%d\n", paramName, x);
+
+			} else if (node.type == CHAR_TYPE) {
+				System.out.printf("  store i8 %%%s, i8* %%%d\n", paramName, x);
+
+			} else {
+				System.out.printf("  store i8* %%%s, i8** %%%d\n", paramName, x);
+			}
+		}
+
 		return "";
 	}
 
@@ -928,7 +1057,7 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 			System.out.printf("  %%%d = load i8*, i8** %%%d\n", x, addr + 1);
 
 		} else if (node.type == ARRAY_TYPE) {
-			Type contentType = gvt.getContentType(addr);
+			Type contentType = currentVt.getContentType(addr);
 			String type = ArrayVar.getSingleType(contentType);
 			System.out.printf("  %%%d = load %s, %s* ", x, type, type);
 
@@ -1133,8 +1262,10 @@ class ArrayVar {
 			type = "double";
 		} else if (contentType == BOOL_TYPE) {
 			type = "i1";
-		} else if (contentType == CHAR_TYPE || contentType == STR_TYPE) {
+		} else if (contentType == CHAR_TYPE) {
 			type = "i8";
+		} else if (contentType == STR_TYPE) {
+			type = "i8*";
 		}
 		return type;
 	}

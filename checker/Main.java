@@ -48,8 +48,9 @@ public class Main {
 
 		System.err.println("Generating Code...\n\n");
 
-		CodeGen codeGen = new CodeGen(checker.stringTable,
-				checker.globalScope.getVaraibleTable());
+		CodeGen codeGen = new CodeGen(
+				checker.stringTable,
+				checker.globalScope);
 		codeGen.execute(checker.getAST());
 	}
 
