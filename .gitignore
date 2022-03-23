@@ -28,6 +28,7 @@ bin
 
 # outputs
 out/
+*.ll
 
 # ide files/folders
 .vscode/
