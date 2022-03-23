@@ -23,8 +23,10 @@ DATA=$(ROOT)/tests
 IN=$(DATA)/cp3/in
 OUT=$(DATA)/cp3/out
 
-FILE=
-OUT_FILE = $(OUT)/$(basename $(notdir $(FILE))).dot
+FILE =
+OUT_DOT = $(OUT)/$(basename $(notdir $(FILE))).dot
+OUT_LL = $(OUT)/$(basename $(notdir $(FILE))).ll
+
 
 all: antlr javac
 	@echo "Done."
@@ -37,20 +39,21 @@ javac:
 	@mkdir $(BIN_PATH)
 	@$(JAVAC) $(CLASS_PATH_OPTION) -d $(BIN_PATH) */*.java
 
-$(OUT_FILE) dot:
+$(OUT_DOT) dot:
 	@mkdir -p $(OUT)
 	
-	@$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(OUT_FILE)
-	@dot -Tpng $(OUT_FILE) -o $(basename $(OUT_FILE)).png 
+	@$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(OUT_DOT)
+	@dot -Tpng $(OUT_DOT) -o $(basename $(OUT_FILE)).png 
 
-# Para gerar um arquivo na mesma pasta (EX:make file FILE=tests/cp3/in/strings.pas)
-# Para rodar esse arquivo na LLVM faça lli <arquivo>.ll
-file:
-	$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(basename $(FILE)).ll
+# This generates the targer <file>.ll
+$(OUT_LL) ll: javac
+	@mkdir -p tests/cp3/out -p
+	@$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(OUT_LL)
 
-# Para imprimir no terminal (EX:make run FILE=tests/cp3/in/strings.pas)
-run:
-	@$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE)
+# This runs the .ll file generated from the input pascal program
+lli: $(OUT_LL)
+	-@lli $(OUT_LL) || true
+
 
 # Run all tests
 runall:
