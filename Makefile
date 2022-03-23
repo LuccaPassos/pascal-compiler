@@ -20,16 +20,11 @@ BIN_PATH=bin
 
 # Directory for the test cases
 DATA=$(ROOT)/tests
-IN=$(DATA)/cp3/in
-OUT=$(DATA)/cp3/out
+IN=$(DATA)/cp3/in/
+OUT=
 
-FILE =
-OUT_DOT = $(OUT)/$(basename $(notdir $(FILE))).dot
-OUT_LL = $(OUT)/$(basename $(notdir $(FILE))).ll
-
-
-all: antlr javac
-	@echo "Done."
+FILE=
+OUT_LL=$(OUT)$(basename $(notdir $(FILE))).ll
 
 antlr: pascalLexer.g4 pascalParser.g4
 	@$(ANTLR4) -no-listener -visitor -o $(GEN_PATH) -package $(GEN_PATH) pascalLexer.g4 pascalParser.g4
@@ -39,14 +34,8 @@ javac:
 	@mkdir $(BIN_PATH)
 	@$(JAVAC) $(CLASS_PATH_OPTION) -d $(BIN_PATH) */*.java
 
-$(OUT_DOT) dot:
-	@mkdir -p $(OUT)
-	
-	@$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(OUT_DOT)
-	@dot -Tpng $(OUT_DOT) -o $(basename $(OUT_FILE)).png 
-
 # This generates the targer <file>.ll
-$(OUT_LL) ll: javac
+$(OUT_LL) ll:
 	@mkdir -p tests/cp3/out -p
 	@$(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $(FILE) > $(OUT_LL)
 
@@ -54,13 +43,12 @@ $(OUT_LL) ll: javac
 lli: $(OUT_LL)
 	-@lli $(OUT_LL) || true
 
-
-# Run all tests
-runall:
-	@-for FILE in $(IN)/*.pas; do \
+# This will run all the .pas files in the IN directory
+runall: javac
+	@-for FILE in $(IN)*.pas; do \
 	 	echo -e "\nRunning $${FILE}" && \
-		make dot FILE=$${FILE} \
-	 	# $(JAVA) $(CLASS_PATH_OPTION):$(BIN_PATH) $(MAIN_PATH)/Main $${FILE}; \
+	 	make lli OUT=$(DATA)/cp3/out/ FILE=$${FILE} -s &&\
+		echo -e; \
 	done;
 
 clean:
