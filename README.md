@@ -1,7 +1,35 @@
 # pascal-compiler
-This is a compiler from Pascal to LLVM.
+This is a compiler from Pascal to LLVM. It was implemented in Java using [`antlr`](https://www.antlr.org/).
 
-## Lexer and Parser
-You can run the `make` command to build the lexer and parser, `make run` to run a single file (set the `FILE` var to the file you want to run), `make runall` to run all the files in the `IN` dir (set to the `examples/` folder by default).
+## Running
 
-By running `make dot FILE=path/of/input.pas` runs the parser with the specified input file and generates a `.png` file containing the AST's representation.
+**Compile the compiler**
+
+Firstly, compile the compiler using
+
+    make javac
+
+This will generate all the Jaca `.class` files in the `bin/` folder.
+
+**Running the compiler and the program**
+
+To run the compiler and generate the `.ll` target from a `.pas` input, you can use
+
+    make ll FILE=path/to/file.pas
+
+This will generate a file in the root directory called `file.ll`. You can use `lli` to run the program
+
+    lli file.ll
+
+You can also compile the program and automaticaly run it with
+
+    make lli FILE=path/to/file.pas
+
+**Tests**
+
+There are a few tests for some of the implemented features of the language. To run them, simply run
+
+    make runall
+
+This will compile all the programs in `tests/cp3/in/` and generate the `.ll` files in `tests/cp3/out/`
+
