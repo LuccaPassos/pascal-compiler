@@ -42,11 +42,9 @@ public class Main {
 		SemanticChecker checker = new SemanticChecker();
 		checker.visit(tree);
 
-		System.err.println("PARSE SUCCESSFUL!");
-		// checker.printTables();
-		// checker.printAST();
+		// System.err.println("PARSE SUCCESSFUL!");
 
-		System.err.println("Generating Code...\n\n");
+		// System.err.println("Generating Code...\n\n");
 
 		CodeGen codeGen = new CodeGen(
 				checker.stringTable,

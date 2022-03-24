@@ -9,11 +9,12 @@ begin
 end;
 
 var
-    i:integer;
+    i, n:integer;
 
 begin
 	i := 1;
-    while (i <= 16) do begin
+	read (n);
+    while (i <= n) do begin
         write(fib(i), ', ');
 		i := i + 1;
 	end;	

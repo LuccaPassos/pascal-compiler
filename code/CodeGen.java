@@ -29,7 +29,6 @@ public final class CodeGen extends ASTBaseVisitor<String> {
 	private final StringTable st;
 	private final FunctionTable ft;
 
-	// private final VariableTable gvt; // global
 	private VariableTable currentVt;
 
 	private final Scope globalScope;

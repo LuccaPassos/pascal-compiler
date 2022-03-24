@@ -7,11 +7,6 @@ public abstract class ASTBaseVisitor<T> {
 	}
 
 	protected T visit(AST node) {
-		// System.out.println(">>> node start");
-		// System.out.println(node.type);
-		// System.out.println(node.intData);
-		// System.out.println(node.kind);
-		// System.out.println(">>> node end");
 		switch (node.kind) {
 			case ASSIGN_NODE:
 				return visitAssign(node);
